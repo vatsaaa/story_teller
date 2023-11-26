@@ -10,7 +10,7 @@ from googleapiclient.http import MediaFileUpload
 from google_auth_oauthlib.flow import InstalledAppFlow
 
 # Project imports
-from IPublisher import IPublisher
+from utils.publishers.IPublisher import IPublisher
 
 
 httplib2.RETRIES = 1

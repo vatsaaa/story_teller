@@ -6,7 +6,7 @@ import openai
 import tweepy
 
 # Project imports
-from IPublisher import IPublisher
+from utils.publishers.IPublisher import IPublisher
 
 class TwitterPublisher(IPublisher):
     def __init__(self, consumer_key, consumer_secret, access_token, access_token_secret, temperature: float = 0.5):

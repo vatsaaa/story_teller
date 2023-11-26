@@ -57,30 +57,57 @@ def process_args(args: list):
 
     return retvals
 
-def main(progargs: dict) -> None:
+def main(progargs: dict):
     # Create Story object and initialize it with the program arguments
     story = Story(progargs)
 
     # Get story from the website
     story.get_text()
 
+    return story.title, story.text
+
     # Translate story text and title to English so as get visualization 
     # text for creating images in the next step
-    story.translate()
+    # story.translate()
 
     # The visualization text we get in step above 
     # is used to get images for the story
-    story.get_images()
+    # story.get_images()
 
     # The images we get in step above are used to
     # generate a video for the story
-    story.get_video()
+    # story.get_video()
 
     # Get story audio
-    story.get_audio('gTTS')
+    # story.get_audio('gTTS')
 
     # Publish the story now
-    story.publish()
+    # story.publish()
 
 if __name__ == "__main__":
+    # st.title("Story Generator")
+    # st.subheader("A tool to generate stories for social media")
+
+    # with st.form(key='my_form'):
+    #     # st.write("Enter the URL of the story you want to generate")
+    #     url = st.text_input(label='URL', help='Enter the URL of the story you want to generate', autocomplete='on')
+
+    #     cb_fb = st.checkbox(label='Facebook')
+    #     cb_ig = st.checkbox(label='Instagram')
+    #     cb_tw = st.checkbox(label='Twitter')
+    #     cb_yt = st.checkbox(label='YouTube')
+        
+    #     submit_button = st.form_submit_button(label='Submit')
+
+    # if submit_button:
+    #     title, text = main({'url': url,
+    #                         'fb': cb_fb,
+    #                         'ig': cb_ig, 
+    #                         'tw': cb_tw, 
+    #                         'yt': cb_yt
+    #                         })
+    #     st.balloons()
+    #     st.write(title.get("Hindi") + "\n\n" + text.get("Hindi"))
+        # st.success('Story generated successfully!')
+
     main(process_args(argv[1:]))
