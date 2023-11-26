@@ -32,7 +32,7 @@ def process_args(args: list):
     }
 
     try:
-        opts, args = getopt.getopt(args, "hi:u:", ["help", "images=", "url="])
+        opts, args = getopt.getopt(args, "hfgi:tu:y", ["help", "facebook", "instagram" "images=", "twitter" "url=", "youtube"])
     except getopt.GetoptError as err:
         print(err)
         exit(2)
@@ -42,7 +42,7 @@ def process_args(args: list):
             usage(2)
         elif opt in ("-f", "--facebook"):
             retvals['fb'] = SocialMedia.FACEBOOK
-        elif opt in ("-g", "--gram"):
+        elif opt in ("-g", "--instagram"):
             retvals['ig'] = SocialMedia.INSTAGRAM
         elif opt in ("-i", "--image"):
             retvals['images'] = arg
@@ -85,29 +85,52 @@ def main(progargs: dict):
     # story.publish()
 
 if __name__ == "__main__":
-    # st.title("Story Generator")
-    # st.subheader("A tool to generate stories for social media")
+    mainargs = None
 
-    # with st.form(key='my_form'):
-    #     # st.write("Enter the URL of the story you want to generate")
-    #     url = st.text_input(label='URL', help='Enter the URL of the story you want to generate', autocomplete='on')
+    if len(argv) < 2:
+        st.title("Story Generator")
+        st.subheader("A tool to generate stories for social media")
 
-    #     cb_fb = st.checkbox(label='Facebook')
-    #     cb_ig = st.checkbox(label='Instagram')
-    #     cb_tw = st.checkbox(label='Twitter')
-    #     cb_yt = st.checkbox(label='YouTube')
+        with st.form(key='my_form'):
+            url = st.text_input(label='URL', help='Enter the URL of the story you want to generate', autocomplete='on')
+
+            c_fb, c_ig, c_tw, c_yt = st.columns([1, 1, 1, 1])
+
+            with c_fb:
+                cb_fb = st.checkbox(label='Facebook')
         
-    #     submit_button = st.form_submit_button(label='Submit')
+            with c_ig:
+                cb_ig = st.checkbox(label='Instagram')
+            
+            with c_tw:
+                cb_tw = st.checkbox(label='Twitter')
+            
+            with c_yt:
+                cb_yt = st.checkbox(label='YouTube')
+            
+            submit_button = st.form_submit_button(label='Submit')
 
-    # if submit_button:
-    #     title, text = main({'url': url,
-    #                         'fb': cb_fb,
-    #                         'ig': cb_ig, 
-    #                         'tw': cb_tw, 
-    #                         'yt': cb_yt
-    #                         })
-    #     st.balloons()
-    #     st.write(title.get("Hindi") + "\n\n" + text.get("Hindi"))
-        # st.success('Story generated successfully!')
+            if submit_button:
+                mainargs = {'url': url
+                            , 'fb': cb_fb
+                            , 'ig': cb_ig
+                            , 'tw': cb_tw
+                            , 'yt': cb_yt
+                        }
+                title, text = main(mainargs)
 
-    main(process_args(argv[1:]))
+                st.title("Story Generator")                
+                st.subheader(title.get("Hindi") + "\n\n")
+                st.write(introduction.get("Hindi") + "\n\n")
+                st.write(text.get("Hindi") + "\n\n")
+                st.write(conclusion.get("Hindi") + "\n\n")
+    elif len(argv) == 2 and (argv[1] == '-h' or argv[1] == '--help'):
+        usage(2)
+    else:
+        mainargs = process_args(argv[1:])
+        title, text = main(mainargs)
+
+        print(title.get("Hindi"), "\n\n")
+        print(introduction.get("Hindi"), "\n\n")
+        print(text.get("Hindi"), "\n\n")
+        print(conclusion.get("Hindi"), "\n\n")

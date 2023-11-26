@@ -8,7 +8,7 @@ from langchain.prompts import PromptTemplate
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 import openai
 from os import getenv, path
-import pyttsx3
+import pyttsx3, re
 from string import punctuation
 from sys import stderr
 
@@ -46,6 +46,8 @@ class Story:
         self.date = datetime.datetime.today().strftime('%Y-%m-%d')
 
     def get_text(self):
+        pattern = re.compile(r':\s$', re.MULTILINE)
+
         response = requests.get(self.url)
         
         soup = BeautifulSoup(response.content, 'html.parser')
@@ -53,7 +55,7 @@ class Story:
         paragraphs = soup.find_all('p')
 
         self.title["Hindi"] = [h.get_text() for h in headings][0].split(":")[0]
-        self.text["Hindi"] = [p.get_text().replace("दु:खी", "दुखी") for p in paragraphs][0].split(":")[0]
+        self.text["Hindi"] = [re.sub(pattern, '-', p.get_text().replace("दु:खी", "दुखी")) for p in paragraphs][0].split(":")[0]
 
     def translate(self) -> None:
         if self.text.get("Hindi"):

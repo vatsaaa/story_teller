@@ -8,7 +8,7 @@
             "program": "${file}",
             "console": "integratedTerminal",
             "args": [
-                "-h"
+                "-g", "-t", "-u https://hindikahani.hindi-kavita.com/Ratnamanjari-Sinhasan-Battisi.php"
             ]
         }
     ]
