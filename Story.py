@@ -2,8 +2,11 @@ from bs4 import BeautifulSoup
 import datetime, dotenv, itertools, json, requests
 from gtts import gTTS
 from gtts.tokenizer.pre_processors import abbreviations, end_of_line
+from langchain.chains import LLMChain
+from langchain.llms.fake import FakeListLLM
 from langchain.chains.summarize import load_summarize_chain
 from langchain.chat_models import ChatOpenAI
+from langchain.llms import OpenAI
 from langchain.prompts import PromptTemplate
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 import openai
@@ -45,6 +48,8 @@ class Story:
         self.images = list()
         self.date = datetime.datetime.today().strftime('%Y-%m-%d')
 
+        self.llm = OpenAI(temperature=0.4)
+
     def get_text(self):
         pattern = re.compile(r':\s$', re.MULTILINE)
 
@@ -59,10 +64,37 @@ class Story:
 
     def translate(self) -> None:
         if self.text.get("Hindi"):
-            self.title["English"] = self.title["Hindi"]
-            self.text["English"] = self.text["Hindi"]
+            # Get the text to be translated
+            text_to_translate = self.text.get("Hindi")
+
+            # Set up the translation prompt, grammer (e.g. articles) omitted for brevity
+            translation_template = '''
+            Following tag <TEXT>, is text of famous kids story in {from_lang} language. Please translate it to {to_lang} language.
+            
+            Return only the translation in {to_lang} language, not any text in original {from_lang} language.
+
+            Returned text must be suitable for a blog and a podcast higly popular amongst kids of 5 years to 14 years.
+            Ensure returned text is highly engaging with elaborated and illustrative scenes.
+
+
+            <TEXT>
+            {text}
+            '''
+
+            text_prompt = PromptTemplate(template=translation_template, input_variables=['from_lang', 'to_lang', 'text'])
+
+            chain2 = LLMChain(llm=self.llm,prompt=text_prompt)
+
+            # Extract the translated text from the API response
+            input = {'from_lang': "Hindi", 'to_lang': "English", 'text': text_to_translate}
+            translated_text = chain2.run(input)
+
+            # Print the translated text
+            print("\n\n<TRANSLATION>\n")
+            print(translated_text)
+            print("\n</TRANSLATION>\n\n")
         else:
-            raise CustomException("Translate can be called only after having fetched the Hindi story!")
+            raise CustomException("Please call .translate() after having fetched the Hindi story!")
 
     def get_moral(self):
         # Having created the English story, we get its moral
@@ -105,10 +137,9 @@ class Story:
                     handler.write(img_data)
 
     def get_audio(self, lib: str):
+        final_text = introduction.get("Hindi") + "\n\n" + self.text.get("Hindi") + "\n\n" + conclusion.get("Hindi") + "\n\n"
         if lib.lower() == 'gtts':
             gttsLang = 'hi'
-
-            final_text = introduction + "\n\n" + self.text.get("Hindi") + "\n\n" + conclusion
 
             replyObj = gTTS(text=final_text, lang=gttsLang, slow=True, pre_processor_funcs=[abbreviations, end_of_line])
             self.audio_name = self.title.get("Hindi").replace(" ", '').translate(str.maketrans('', '', punctuation)) + ".mp3"
@@ -120,7 +151,7 @@ class Story:
             for voice in enumerate(voices):
                 print(voice[0], "Voice ID: ", voice[1].id, voice[1].languages[0])
                 engine.setProperty('voice', voice[1].id)
-                engine.say("धन्यवाद मेरे प्यारे नन्हें श्रोताओं! आशा है यह कहानी आपको पसंद आई होगी, इसकी सीख अवश्य याद रखना!")
+                engine.say(final_text)
                 engine.runAndWait()
         else:
             raise CustomException("Please use a valid speech processing library. {lib} is not valid!".format(lib=lib))

@@ -64,11 +64,9 @@ def main(progargs: dict):
     # Get story from the website
     story.get_text()
 
-    return story.title, story.text
-
     # Translate story text and title to English so as get visualization 
     # text for creating images in the next step
-    # story.translate()
+    story.translate()
 
     # The visualization text we get in step above 
     # is used to get images for the story
@@ -119,9 +117,9 @@ if __name__ == "__main__":
                         }
                 title, text = main(mainargs)
 
-                st.title("Story Generator")                
-                st.subheader(title.get("Hindi") + "\n\n")
+                st.title("Story Generator")
                 st.write(introduction.get("Hindi") + "\n\n")
+                st.write(title.get("Hindi") + "\n\n")
                 st.write(text.get("Hindi") + "\n\n")
                 st.write(conclusion.get("Hindi") + "\n\n")
     elif len(argv) == 2 and (argv[1] == '-h' or argv[1] == '--help'):
@@ -130,7 +128,7 @@ if __name__ == "__main__":
         mainargs = process_args(argv[1:])
         title, text = main(mainargs)
 
-        print(title.get("Hindi"), "\n\n")
         print(introduction.get("Hindi"), "\n\n")
+        print(title.get("Hindi"), "\n\n")
         print(text.get("Hindi"), "\n\n")
         print(conclusion.get("Hindi"), "\n\n")
