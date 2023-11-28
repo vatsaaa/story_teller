@@ -26,13 +26,14 @@ def process_args(args: list):
         'fb': 0,
         'ig': 0,
         'images': 0,
+        'mock': False,
         'tw': 0,
         'url': None,
         'yt': 0
     }
 
     try:
-        opts, args = getopt.getopt(args, "hfgi:tu:y", ["help", "facebook", "instagram" "images=", "twitter" "url=", "youtube"])
+        opts, args = getopt.getopt(args, "hfgi:mtu:y", ["help", "facebook", "instagram" "images=", "mock", "twitter" "url=", "youtube"])
     except getopt.GetoptError as err:
         print(err)
         exit(2)
@@ -46,6 +47,8 @@ def process_args(args: list):
             retvals['ig'] = SocialMedia.INSTAGRAM
         elif opt in ("-i", "--image"):
             retvals['images'] = arg
+        elif opt in ("-m", "--mock"):
+            retvals['mock'] = True
         elif opt in ("-t", "--twitter"):
             retvals['tw'] = SocialMedia.TWITTER
         elif opt in ("-u", "--url"):
@@ -68,6 +71,8 @@ def main(progargs: dict):
     # text for creating images in the next step
     story.translate()
 
+    return story.title.get("Hindi"), story.text.get("Hindi"), story.title.get("English"), story.text.get("English")
+
     # The visualization text we get in step above 
     # is used to get images for the story
     # story.get_images()
@@ -86,8 +91,8 @@ if __name__ == "__main__":
     mainargs = None
 
     if len(argv) < 2:
-        st.title("Story Generator")
-        st.subheader("A tool to generate stories for social media")
+        st.title("Story Teller")
+        st.subheader("Stories for social media")
 
         with st.form(key='my_form'):
             url = st.text_input(label='URL', help='Enter the URL of the story you want to generate', autocomplete='on')
@@ -114,21 +119,33 @@ if __name__ == "__main__":
                             , 'ig': cb_ig
                             , 'tw': cb_tw
                             , 'yt': cb_yt
+                            , 'mock': True # TODO: Set this to False when a checkbox for mocking is added to the UI
                         }
-                title, text = main(mainargs)
+                h_title, h_text, e_title, e_text = main(mainargs)
+                
+                st.subheader("Hindi:")
+                st.text_area(label="Introduction", height=200, value=introduction.get("Hindi"))
+                st.text_area(label="Story", height=250, value=h_title + "\n" + h_text.strip())
+                st.text_area(label="Conclusion", height=100, value=conclusion.get("Hindi"))
 
-                st.title("Story Generator")
-                st.write(introduction.get("Hindi") + "\n\n")
-                st.write(title.get("Hindi") + "\n\n")
-                st.write(text.get("Hindi") + "\n\n")
-                st.write(conclusion.get("Hindi") + "\n\n")
+                st.subheader("English:")
+                st.text_area(label="Introduction", height=200, value=introduction.get("English"))
+                st.text_area(label="Story", height=250, value=e_title + "\n" + e_text if e_title else e_text)
+                st.text_area(label="Conclusion", height=110, value=conclusion.get("English"))
+                
+                submit_button = st.form_submit_button(label='Accept Translation')
     elif len(argv) == 2 and (argv[1] == '-h' or argv[1] == '--help'):
         usage(2)
     else:
         mainargs = process_args(argv[1:])
-        title, text = main(mainargs)
+        h_title, h_text, e_title, e_text = main(mainargs)
 
         print(introduction.get("Hindi"), "\n\n")
-        print(title.get("Hindi"), "\n\n")
-        print(text.get("Hindi"), "\n\n")
+        print(h_title, "\n\n")
+        print(h_text, "\n\n")
         print(conclusion.get("Hindi"), "\n\n")
+
+        print(introduction.get("English"), "\n\n")
+        print(e_title, "\n\n")
+        print(e_text, "\n\n")
+        print(conclusion.get("English"), "\n\n")

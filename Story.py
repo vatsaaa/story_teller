@@ -30,6 +30,7 @@ from CustomException import CustomException
 from utils.publishers.InstagramPublisher import InstagramPublisher
 from utils.publishers.TwitterPublisher import TwitterPublisher
 from utils.publishers.YoutubePublisher import YoutubePublisher
+from utils.mock.inputs import mock_text, mock_title
 
 class Story:
     id_obj = itertools.count(1)
@@ -41,40 +42,58 @@ class Story:
         self.yt = progargs.get('yt')
 
         self.id = next(Story.id_obj)
-        self.url = progargs.get('url')
-        self.title = {}
-        self.text = {}
-        self.moral = {}
+        
+        if progargs.get('mock'):
+            self.url = None
+            self.mock = True
+            self.text = mock_text
+            self.title = mock_title
+            self.llm = None
+        else: 
+            self.url = progargs.get('url')
+            self.mock = False
+            self.text = {
+                "Hindi": None,
+                "English": None
+            }
+            self.title = {
+                "Hindi": None,
+                "English": None
+            }
+            self.llm = ChatOpenAI(temperature=0.4)
+
+        self.moral = dict()
         self.images = list()
         self.date = datetime.datetime.today().strftime('%Y-%m-%d')
 
-        self.llm = OpenAI(temperature=0.4)
 
     def get_text(self):
-        pattern = re.compile(r':\s$', re.MULTILINE)
+        if self.mock:
+            self.text = mock_text
+        else:
+            pattern = re.compile(r':\s$', re.MULTILINE)
 
-        response = requests.get(self.url)
-        
-        soup = BeautifulSoup(response.content, 'html.parser')
-        headings = soup.find_all('h1')
-        paragraphs = soup.find_all('p')
+            response = requests.get(self.url)
+            
+            soup = BeautifulSoup(response.content, 'html.parser')
+            headings = soup.find_all('h1')
+            paragraphs = soup.find_all('p')
 
-        self.title["Hindi"] = [h.get_text() for h in headings][0].split(":")[0]
-        self.text["Hindi"] = [re.sub(pattern, '-', p.get_text().replace("दु:खी", "दुखी")) for p in paragraphs][0].split(":")[0]
+            self.title["Hindi"] = [h.get_text() for h in headings][0].split(":")[0]
+            self.text["Hindi"] = [re.sub(pattern, '-', p.get_text().replace("दु:खी", "दुखी")) for p in paragraphs][0].split(":")[0]
 
     def translate(self) -> None:
-        if self.text.get("Hindi"):
-            # Get the text to be translated
+        if not self.mock and self.text.get("Hindi") and not self.text.get("English"):
             text_to_translate = self.text.get("Hindi")
 
             # Set up the translation prompt, grammer (e.g. articles) omitted for brevity
             translation_template = '''
-            Following tag <TEXT>, is text of famous kids story in {from_lang} language. Please translate it to {to_lang} language.
+            Please act as a highly proficient translator for {from_lang} and {to_lang} languages.
+            After <TEXT>, is the text of a popular story for kids in {from_lang} language. Please translate it to {to_lang} language.
             
             Return only the translation in {to_lang} language, not any text in original {from_lang} language.
 
-            Returned text must be suitable for a blog and a podcast higly popular amongst kids of 5 years to 14 years.
-            Ensure returned text is highly engaging with elaborated and illustrative scenes.
+            Ensure that returned text is highly engaging and suitable for a youtube channel higly popular amongst kids of 5 years to 14 years.
 
 
             <TEXT>
@@ -90,9 +109,9 @@ class Story:
             translated_text = chain2.run(input)
 
             # Print the translated text
-            print("\n\n<TRANSLATION>\n")
-            print(translated_text)
-            print("\n</TRANSLATION>\n\n")
+            self.text["English"] = translated_text
+        elif self.mock and self.text.get("Hindi") and self.text.get("English"):
+            pass
         else:
             raise CustomException("Please call .translate() after having fetched the Hindi story!")
 
@@ -104,7 +123,7 @@ class Story:
         # Then we translate the English moral to Hindi
         self.moral["Hindi"] = self.moral.get("English")
     
-    def get_images(self, width: int = 1024, height: int = 512, count: int = 1) -> list:
+    def get_images(self, width: int = 512, height: int = 512, count: int = 1) -> list:
         image_title = self.title
 
         img_data = None
