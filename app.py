@@ -1,4 +1,4 @@
-import getopt
+import getopt, re
 from sys import argv
 from os import getenv
 import streamlit as st
@@ -91,6 +91,7 @@ if __name__ == "__main__":
     mainargs = None
 
     if len(argv) < 2:
+        st.set_page_config(layout="wide")
         st.title("Story Teller")
         st.subheader("Stories for social media")
 
@@ -124,14 +125,14 @@ if __name__ == "__main__":
                 h_title, h_text, e_title, e_text = main(mainargs)
                 
                 st.subheader("Hindi:")
-                st.text_area(label="Introduction", height=200, value=introduction.get("Hindi"))
-                st.text_area(label="Story", height=250, value=h_title + "\n" + h_text.strip())
-                st.text_area(label="Conclusion", height=100, value=conclusion.get("Hindi"))
+                st.text_area(label="Introduction", height=200, value=re.sub(r'[^\S\n]+', ' ', introduction.get("Hindi")))
+                st.text_area(label="Story", height=250, value=re.sub(r'[^\S\n]+', ' ', h_title + "\n" + h_text.strip()))
+                st.text_area(label="Conclusion", height=100, value=re.sub(r'[^\S\n]+', ' ', conclusion.get("Hindi")))
 
                 st.subheader("English:")
-                st.text_area(label="Introduction", height=200, value=introduction.get("English"))
-                st.text_area(label="Story", height=250, value=e_title + "\n" + e_text if e_title else e_text)
-                st.text_area(label="Conclusion", height=110, value=conclusion.get("English"))
+                st.text_area(label="Introduction", height=200, value=re.sub(r'[^\S\n]+', ' ', introduction.get("English")))
+                st.text_area(label="Story", height=250, value=re.sub(r'[^\S\n]+', ' ', e_title + "\n" + e_text if e_title else e_text))
+                st.text_area(label="Conclusion", height=110, value=re.sub(r'[^\S\n]+', ' ', conclusion.get("English")))
                 
                 submit_button = st.form_submit_button(label='Accept Translation')
     elif len(argv) == 2 and (argv[1] == '-h' or argv[1] == '--help'):
