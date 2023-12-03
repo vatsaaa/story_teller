@@ -36,3 +36,17 @@ dist/
 *.swp
 *~
 .DS_Store
+ResumeLatest.xml
+
+images/*.png
+images/*.jpg
+images/*.jpeg
+images/*.gif
+
+audios/*.mp3
+audios/*.wav
+
+videos/*.mp4
+videos/*.avi
+videos/*.mov
+
