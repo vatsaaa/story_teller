@@ -20,7 +20,7 @@ class InstagramPublisher(IPublisher):
         image = content.get("image")
         caption = content.get("caption")
 
-        self.bot.upload_photo(image, caption=caption)
+        # self.bot.upload_photo(image, caption=caption)
 
     def logout(self) -> None:
         self.bot.logout()

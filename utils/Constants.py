@@ -2,7 +2,6 @@ from enum import Enum
 from os import getenv
 
 TEXT_TO_IMAGE_URL = getenv('TEXT_TO_IMAGE_URL')
-STABLEDIFFUSION_API_KEY = getenv('STABLEDIFFUSION_API_KEY')
 
 class SocialMedia(Enum):
     FACEBOOK = 1

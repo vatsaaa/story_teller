@@ -52,3 +52,78 @@ mock_text = {
     In due time, Vikramaditya became the emperor and his fame spread everywhere.
     '''
 }
+
+mock_sceneries = {
+    "Court Affairs Management": {
+        "description": "A scene of daily court affairs management, with a sense of routine and order.",
+        "sentiments": ["Orderliness", "Routine", "Responsibility"]
+    },
+    "Brahmin's Prophecy": {
+        "description": "A moment when a Brahmin arrives, offering a prophecy of prosperity and fame linked to specific celestial conditions.",
+        "sentiments": ["Anticipation", "Hopefulness", "Mystique"]
+    },
+    "Grand Palace Construction": {
+        "description": "The process of constructing a grand palace adorned with opulent materials, following the king's instructions.",
+        "sentiments": ["Creativity", "Opulence", "Craftsmanship"]
+    },
+    "Palace Unveiling": {
+        "description": "The grandeur of the completed palace revealed, leaving observers in awe.",
+        "sentiments": ["Awe", "Wonder", "Admiration"]
+    },
+    "Brahmin's Utterance": {
+        "description": "A moment of enchantment as the Brahmin, mesmerized by the palace, utters a wish.",
+        "sentiments": ["Enchantment", "Mesmerization", "Wishful"]
+    },
+    "Gifted Palace": {
+        "description": "The act of promptly gifting the magnificent palace, a gesture marked by generosity and surprise.",
+        "sentiments": ["Generosity", "Surprise", "Kindness"]
+    },
+    "Brahmin's Joy": {
+        "description": "The Brahmin's joyful state as he rushes to share the news of the gifted palace with his wife.",
+        "sentiments": ["Joy", "Excitement", "Happiness"]
+    },
+    "Brahmin's Confusion": {
+        "description": "A scene of the Brahmin's return home, appearing bewildered, contemplating the nature of the gifted palace.",
+        "sentiments": ["Bewilderment", "Confusion", "Uncertainty"]
+    },
+    "Brahmin's Wife's Amazement": {
+        "description": "The Brahmin's wife, initially shocked, left wide-eyed by the splendor of the palace.",
+        "sentiments": ["Amazement", "Astonishment", "Wonder"]
+    },
+    "Divine Encounter": {
+        "description": "A mystical encounter in the palace during the night, filled with fragrance and divine ambiance.",
+        "sentiments": ["Mystical", "Divine", "Ethereal"]
+    },
+    "Lakshmi's Offer": {
+        "description": "Goddess Lakshmi offering to fulfill any wish, creating a moment of both terror and opportunity.",
+        "sentiments": ["Terror", "Opportunity", "Divine"]
+    },
+    "Brahmin's Refusal": {
+        "description": "The Brahmin's refusal to make a wish, leading to the disappearance of the divine ambiance.",
+        "sentiments": ["Refusal", "Regret", "Loss"]
+    },
+    "Return to Old Hut": {
+        "description": "The Brahmin and his wife returning to their old hut, convinced that the palace is haunted.",
+        "sentiments": ["Convinced", "Reluctance", "Nostalgia"]
+    },
+    "Brahmin's Request": {
+        "description": "The Brahmin requesting the king to take back the palace, against the principle of accepting gifted items.",
+        "sentiments": ["Request", "Dilemma", "Principle"]
+    },
+    "Palace Repurchase": {
+        "description": "Vikramaditya's decision to buy back the palace at a fair price, resolving the predicament.",
+        "sentiments": ["Resolution", "Fairness", "Contentment"]
+    },
+    "King in Gifted Palace": {
+        "description": "Vikramaditya living in the palace, holding court affairs, and enjoying the wealth gifted by Lakshmi.",
+        "sentiments": ["Abundance", "Power", "Contentment"]
+    },
+    "Lakshmi's Second Visit": {
+        "description": "Lakshmi's return, asking if they want anything, leading to a selfless wish for the prosperity of the kingdom.",
+        "sentiments": ["Selflessness", "Prosperity", "Gratitude"]
+    },
+    "Wealth Shower": {
+        "description": "The aftermath of the wish, with wealth raining throughout the kingdom, causing joyous celebrations.",
+        "sentiments": ["Celebration", "Joy", "Abundance"]
+    }
+}

@@ -71,7 +71,7 @@ def main(progargs: dict):
     # text for creating images in the next step
     story.translate()
 
-    return story.title.get("Hindi"), story.text.get("Hindi"), story.title.get("English"), story.text.get("English")
+    # return story.title.get("Hindi"), story.text.get("Hindi"), story.title.get("English"), story.text.get("English")
 
     # The visualization text we get in step above 
     # is used to get images for the story
@@ -98,7 +98,7 @@ if __name__ == "__main__":
         with st.form(key='my_form'):
             url = st.text_input(label='URL', help='Enter the URL of the story you want to generate', autocomplete='on')
 
-            c_fb, c_ig, c_tw, c_yt = st.columns([1, 1, 1, 1])
+            c_fb, c_ig, c_tw, c_yt, c_mk = st.columns([1, 1, 1, 1, 1])
 
             with c_fb:
                 cb_fb = st.checkbox(label='Facebook')
@@ -112,6 +112,9 @@ if __name__ == "__main__":
             with c_yt:
                 cb_yt = st.checkbox(label='YouTube')
             
+            with c_mk:
+                cb_mk = st.checkbox(label='Mock', value=True)
+
             submit_button = st.form_submit_button(label='Submit')
 
             if submit_button:
@@ -120,21 +123,47 @@ if __name__ == "__main__":
                             , 'ig': cb_ig
                             , 'tw': cb_tw
                             , 'yt': cb_yt
-                            , 'mock': True # TODO: Set this to False when a checkbox for mocking is added to the UI
+                            , 'mock': cb_mk
                         }
-                h_title, h_text, e_title, e_text = main(mainargs)
-                
-                st.subheader("Hindi:")
-                st.text_area(label="Introduction", height=200, value=re.sub(r'[^\S\n]+', ' ', introduction.get("Hindi")))
-                st.text_area(label="Story", height=250, value=re.sub(r'[^\S\n]+', ' ', h_title + "\n" + h_text.strip()))
-                st.text_area(label="Conclusion", height=100, value=re.sub(r'[^\S\n]+', ' ', conclusion.get("Hindi")))
 
-                st.subheader("English:")
-                st.text_area(label="Introduction", height=200, value=re.sub(r'[^\S\n]+', ' ', introduction.get("English")))
-                st.text_area(label="Story", height=250, value=re.sub(r'[^\S\n]+', ' ', e_title + "\n" + e_text if e_title else e_text))
-                st.text_area(label="Conclusion", height=110, value=re.sub(r'[^\S\n]+', ' ', conclusion.get("English")))
+                # Now that we have program arguments, create Story object
+                story = Story(mainargs)
+
+                # Get story from url
+                story.get_text()
                 
-                submit_button = st.form_submit_button(label='Accept Translation')
+                st.subheader("हिन्दी कहानी")
+                st.text_area(label="भूमिका", height=120, value=re.sub(r'[^\S\n]+', ' ', introduction.get("Hindi")))
+                st.text_area(label="कहानी", height=320, value=re.sub(r'[^\S\n]+', ' ', story.title.get("Hindi") + "\n" + story.text.get("Hindi").strip()))
+                st.text_area(label="अन्त:भाग", height=80, value=re.sub(r'[^\S\n]+', ' ', conclusion.get("Hindi")))
+
+                st.markdown("""<hr style="height:2px;border:none;color:#333;background-color:#333;" /> """, unsafe_allow_html=True)
+
+                # Translate story text and title to English
+                # This is to get visualization text for creating images
+                story.translate()
+                st.subheader("English Story")
+                st.text_area(label="Introduction", height=120, value=re.sub(r'[^\S\n]+', ' ', introduction.get("English")))
+                st.text_area(label="Story", height=300, value=re.sub(r'[^\S\n]+', ' ', story.title.get("English") + "\n" + story.text.get("English") if story.title.get("English") else story.text.get("English")))
+                st.text_area(label="Conclusion", height=80, value=re.sub(r'[^\S\n]+', ' ', conclusion.get("English")))
+
+                # Get sceneries from translated story text
+                story.get_sceneries()
+                st.subheader("Extracted Sceneries")
+                for key in story.sceneries:
+                    st.text_area(label=key, height=80, value=re.sub(r'[^\S\n]+', ' ', story.sceneries.get(key).get("description")))
+
+                # Get images for the story using the visualization text
+                # story.get_images()
+
+                # Get audio for the story
+                # story.get_audio('gTTS')
+
+                # Get video for the story
+                # story.get_video()
+
+                # Publish the story
+                story.publish()
     elif len(argv) == 2 and (argv[1] == '-h' or argv[1] == '--help'):
         usage(2)
     else:
