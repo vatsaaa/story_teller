@@ -47,6 +47,5 @@ audios/*.mp3
 audios/*.wav
 
 videos/*.mp4
-videos/*.avi
-videos/*.mov
+videos/*.gif
 
