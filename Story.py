@@ -1,16 +1,14 @@
 from bs4 import BeautifulSoup
 import datetime, dotenv, itertools, json, requests
+from typing import List
 
 from gtts import gTTS
 from gtts.tokenizer.pre_processors import abbreviations, end_of_line
 
 from langchain.chains import LLMChain
-from langchain.llms.fake import FakeListLLM
 from langchain.chains.summarize import load_summarize_chain
 from langchain.chat_models import ChatOpenAI
-from langchain.llms import OpenAI
 from langchain.prompts import PromptTemplate
-from langchain.text_splitter import RecursiveCharacterTextSplitter
 
 from moviepy import editor
 from mutagen.mp3 import MP3
@@ -27,75 +25,64 @@ from sys import stderr
 
 from utils.introduction import introduction
 from utils.conclusion import conclusion
-from utils.Constants import SocialMedia, TEXT_TO_IMAGE_URL
+from utils.Constants import TEXT_TO_IMAGE_URL
+from utils.publishers.IPublisher import IPublisher, Publishers
 from utils.Utils import make_api_request, urlify
 from CustomException import CustomException
 from utils.publishers.InstagramPublisher import InstagramPublisher
 from utils.publishers.TwitterPublisher import TwitterPublisher
 from utils.publishers.YoutubePublisher import YoutubePublisher
 from utils.mock.inputs import mock_sceneries, mock_text, mock_title
-
+from IStory import IStory
 
 dotenv.load_dotenv()
 
-class Story:
+class Story(IStory):
     id_obj = itertools.count(1)
 
     def __init__(self, progargs: dict) -> None:
+        super().__init__()
+        
+        self.id = next(Story.id_obj)
+        self.date = datetime.datetime.today().strftime('%Y-%m-%d')
+
         self.fb = progargs.get('fb')
         self.ig = progargs.get('ig')
         self.tw = progargs.get('tw')
         self.yt = progargs.get('yt')
         self.story_name = None
-
-        self.id = next(Story.id_obj)
         
-        if progargs.get('mock'):
-            self.url = None
-            self.mock = True
-            self.text = mock_text
-            self.title = mock_title
-            self.sceneries = mock_sceneries
-            self.llm = None
-        else: 
-            self.url = progargs.get('url')
-            self.mock = False
-            self.text = {
-                "Hindi": None,
-                "English": None
-            }
-            self.title = {
-                "Hindi": None,
-                "English": None
-            }
-            self.sceneries = dict()
-            self.llm = ChatOpenAI(temperature=0.4)
-
-        self.moral = dict()
-        # self.images = list()
-        self.date = datetime.datetime.today().strftime('%Y-%m-%d')
-
+        self.url = progargs.get('url')
+        self.mock = False
+        self.text = {
+            "Hindi": None,
+            "English": None
+        }
+        self.title = {
+            "Hindi": None,
+            "English": None
+        }
+        self.sceneries = dict()
+        self.llm = ChatOpenAI(temperature=0.4)
 
     def get_text(self):
-        if self.mock:
-            self.text = mock_text
-        else:
-            pattern = re.compile(r':\s$', re.MULTILINE)
+        pattern = re.compile(r':\s$', re.MULTILINE)
 
-            response = requests.get(self.url)
-            
-            soup = BeautifulSoup(response.content, 'html.parser')
-            headings = soup.find_all('h1')
-            paragraphs = soup.find_all('p')
+        response = requests.get(self.url)
+        response.raise_for_status()
+        
+        soup = BeautifulSoup(response.content, 'html.parser')
+        headings = soup.find_all('h1')
+        paragraphs = soup.find_all('p')
 
-            self.title["Hindi"] = [h.get_text() for h in headings][0].split(":")[0]
-            self.text["Hindi"] = [re.sub(pattern, '-', p.get_text().replace("दु:खी", "दुखी")) for p in paragraphs][0].split(":")[0]
+        self.title["Hindi"] = [h.get_text() for h in headings][0].split(":")[0]
+        self.text["Hindi"] = [re.sub(pattern, '-', p.get_text().replace("दु:खी", "दुखी").replace("छ:", "छह")) for p in paragraphs][0].split(":")[0]
 
         # Set the story name using the title
         self.story_name = self.title.get("Hindi").replace(" ", '').translate(str.maketrans('', '', punctuation))
 
     def translate(self) -> None:
-        if not self.mock and self.text.get("Hindi") and not self.text.get("English"):
+        if self.text.get("Hindi"):
             text_to_translate = self.text.get("Hindi")
 
             # Set up the translation prompt, grammer (e.g. articles) omitted for brevity
@@ -120,40 +107,29 @@ class Story:
 
             # Print the translated text
             self.text["English"] = translated_text
-        elif self.mock and self.text.get("Hindi") and self.text.get("English"):
-            pass
         else:
             raise CustomException("Please call .translate() after having fetched the Hindi story!")
 
-    def get_moral(self):
-        # Having created the English story, we get its moral
-        if self.text.get("English"):
-            self.moral["English"] = self.text.get("English")
-
-        # Then we translate the English moral to Hindi
-        self.moral["Hindi"] = self.moral.get("English")
-    
     def get_sceneries(self):
-        if not self.mock and self.text.get("English"):
-            template_prompt = '''Please act as a highly creative and accomplished "visual illustrator" that extracts sceneries from story text given within <STORY> and </STORY> tags. 
-            Detailed explanation of sceneries extracted from the given story text should not have names of the characters, places or other proper nouns. All living beings should should be accompanied by others in the sceneries.
-            The sceneries should set in natural surroundings, with humans, trees, flowers, water bodies, birds, mountains, valleys, Sun, Moon, stars, animals and other living beings in them. Indoor scenes should be spared unless explained in the story.
-            Where possible, especially when outdoors, the explanation of sceneries should have details about climate, weather, time of the day, season, etc.
-            The extracted sceneries should be represented as a Python dictionary where title of the scene is the key and value is a nested python dictionary with the detailed description of the scene as the first element. 
-            The second element in the nested dictionary is a list of sentiments that can be used to explain the scenery in the detailed description. 
-            Nothing else is required in the output Python dictionary.
+        template_prompt = '''Please act as a highly creative and accomplished "visual illustrator" that extracts sceneries from story text given within <STORY> and </STORY> tags. 
+        Detailed explanation of sceneries extracted from the given story text should not have names of the characters, places or other proper nouns. All living beings should should be accompanied by others in the sceneries.
+        The sceneries should set in natural surroundings, with humans, trees, flowers, water bodies, birds, mountains, valleys, Sun, Moon, stars, animals and other living beings in them. Indoor scenes should be spared unless explained in the story.
+        Where possible, especially when outdoors, the explanation of sceneries should have details about climate, weather, time of the day, season, etc.
+        The extracted sceneries should be represented as a Python dictionary where title of the scene is the key and value is a nested python dictionary with the detailed description of the scene as the first element. 
+        The second element in the nested dictionary is a list of sentiments that can be used to explain the scenery in the detailed description. 
+        Nothing else is required in the output Python dictionary.
 
-            <STORY>{story}</STORY>
-            '''
+        <STORY>{story}</STORY>
+        '''
 
-            sceneries_prompt = PromptTemplate(template=template_prompt, input_variables=['story'])
+        sceneries_prompt = PromptTemplate(template=template_prompt, input_variables=['story'])
 
-            chain2 = LLMChain(llm=self.llm,prompt=sceneries_prompt)
-            input = {'story': self.text.get("English")}
-            
-            self.sceneries = chain2.run(input)
+        chain2 = LLMChain(llm=self.llm,prompt=sceneries_prompt)
+        input = {'story': self.text.get("English")}
+        
+        self.sceneries = chain2.run(input)
     
-    def get_images(self, width: int = 512, height: int = 512, count: int = 1) -> None:
+    def get_images(self, width: int = 512, height: int = 512, count: int = 1) -> None:        
         for key in self.sceneries:
             scenery_title = key
             scenery_prompt = '''Create a hyper-realistic scene described in these words: {description}. 
@@ -186,16 +162,22 @@ class Story:
             }
 
             response = make_api_request(TEXT_TO_IMAGE_URL, data, headers)
-            # print(response.json().get('output'))[0]
-            img_data = requests.get(image_url).content if image_url else None
+            if response.status_code == 200 and response.json().get('status').lower() != 'success':
+                raise CustomException("Error: Image generation from Stable Diffusion did not work as expected!")
 
+            # TODO: Use a for loop instead of 0 index
+            # We use 0 for now as only one
+            # image is requested by default
+            image_url = response.json().get('output')[0]
+
+            # TODO: Use make_api_request here?
+            img_data = requests.get(image_url).content if image_url else None
             if img_data:
-                output_path = path.join('./images/', urlify(scenery_title) + '.png')
+                img_name = './images/', urlify(scenery_title) + '.png'
+                output_path = path.join(img_name)
                 with open(output_path, 'wb') as handler:
                     handler.write(img_data)
             
-            break
-
     def get_audio(self, lib: str) -> None:
         final_text = introduction.get("Hindi") + "\n\n" + self.text.get("Hindi") + "\n\n" + conclusion.get("Hindi") + "\n\n"
         if lib.lower() == 'gtts':
@@ -251,11 +233,6 @@ class Story:
         video = video.set_audio(audio).set_fps(60)
         video.write_videofile(video_path)        
     
-    def _publish_facebook(self) -> None:
-        if not self.fb:
-            return
-        
-
     def _publish_instagram(self) -> None:
         if not self.ig:
             return
@@ -322,11 +299,8 @@ class Story:
         )
         youtuber.publish(self.text.get("Hindi"))
 
-    def publish(self) -> None:
-        self._publish_facebook() if self.fb else None
-
-        self._publish_instagram() if self.ig else None
-        
-        self._publish_twitter() if self.tw else None
-        
-        self._publish_youtube() if self.yt else None
+    def publish(self, publishers: List[IPublisher]) -> None:
+        for publisher in publishers:
+            publisher.login()
+            publisher.publish()
+            publisher.logout()

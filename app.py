@@ -5,21 +5,11 @@ import streamlit as st
 
 # Project imports
 from Story import Story
-from utils.Constants import SocialMedia
+from StoryMock import StoryMock
 from utils.conclusion import conclusion
 from utils.introduction import introduction
-
-def usage(exit_code: int) -> None:
-    print("Usage: app.py [OPTIONS]")
-    print("Options:")
-    print("\t-h, --help\t\t\t\tPrint this help message\n\n")
-    print("\t- f, --help\t\t\t\tPublish to Facebook")
-    print("\t- g, --help\t\t\t\tPublish to Instagram")
-    print("\t-i, --image\t\t\t\tNumber of images to generate")
-    print("\t-t, --help\t\t\t\tPublish to Twitter (i.e. x.com)")
-    print("\t-u, --url\t\t\t\tUrl to get story from")
-    print("\t-y, --help\t\t\t\tPublish to YouTube")
-    exit(exit_code)
+from utils.publishers.IPublisher import Publishers
+from utils.Utils import usage
 
 def process_args(args: list):
     retvals = {
@@ -42,19 +32,19 @@ def process_args(args: list):
         if opt in ("-h", "--help"):
             usage(2)
         elif opt in ("-f", "--facebook"):
-            retvals['fb'] = SocialMedia.FACEBOOK
+            retvals['fb'] = Publishers.FACEBOOK
         elif opt in ("-g", "--instagram"):
-            retvals['ig'] = SocialMedia.INSTAGRAM
+            retvals['ig'] = Publishers.INSTAGRAM
         elif opt in ("-i", "--image"):
             retvals['images'] = arg
         elif opt in ("-m", "--mock"):
             retvals['mock'] = True
         elif opt in ("-t", "--twitter"):
-            retvals['tw'] = SocialMedia.TWITTER
+            retvals['tw'] = Publishers.TWITTER
         elif opt in ("-u", "--url"):
             retvals['url'] = arg
         elif opt in ("-y", "--youtube"):
-            retvals['yt'] = SocialMedia.YOUTUBE
+            retvals['yt'] = Publishers.YOUTUBE
         else:
             usage(4)
 
@@ -62,7 +52,10 @@ def process_args(args: list):
 
 def main(progargs: dict):
     # Create Story object and initialize it with the program arguments
-    story = Story(progargs)
+    if progargs.get('mock'):
+        story = StoryMock(progargs)
+    else:
+        story = Story(progargs)
 
     # Get story from the website
     story.get_text()
@@ -75,14 +68,14 @@ def main(progargs: dict):
 
     # The visualization text we get in step above 
     # is used to get images for the story
-    # story.get_images()
+    story.get_images()
 
     # The images we get in step above are used to
     # generate a video for the story
-    # story.get_video()
+    story.get_video()
 
     # Get story audio
-    # story.get_audio('gTTS')
+    story.get_audio('gTTS')
 
     # Publish the story now
     # story.publish()
@@ -95,75 +88,123 @@ if __name__ == "__main__":
         st.title("Story Teller")
         st.subheader("Stories for social media")
 
-        with st.form(key='my_form'):
-            url = st.text_input(label='URL', help='Enter the URL of the story you want to generate', autocomplete='on')
+        tb_request, tb_story_h, tb_story_e, tb_sceneries, tb_images, tb_audio, tb_video = st.tabs(["Request", "Hindi Story", "English Story", "Sceneries", "Images", "Audio", "Video"])
+        with tb_request:
+            with st.form(key='request_form'):
+                url = st.text_input(label='URL', help='Enter the URL of the story you want to generate', autocomplete='on')
 
-            c_fb, c_ig, c_tw, c_yt, c_mk = st.columns([1, 1, 1, 1, 1])
+                c_fb, c_ig, c_tw, c_yt, c_mk = st.columns([1, 1, 1, 1, 1])
 
-            with c_fb:
-                cb_fb = st.checkbox(label='Facebook')
-        
-            with c_ig:
-                cb_ig = st.checkbox(label='Instagram')
+                with c_fb:
+                    cb_fb = st.checkbox(label='Facebook')
             
-            with c_tw:
-                cb_tw = st.checkbox(label='Twitter')
-            
-            with c_yt:
-                cb_yt = st.checkbox(label='YouTube')
-            
-            with c_mk:
-                cb_mk = st.checkbox(label='Mock', value=True)
-
-            submit_button = st.form_submit_button(label='Submit')
-
-            if submit_button:
-                mainargs = {'url': url
-                            , 'fb': cb_fb
-                            , 'ig': cb_ig
-                            , 'tw': cb_tw
-                            , 'yt': cb_yt
-                            , 'mock': cb_mk
-                        }
-
-                # Now that we have program arguments, create Story object
-                story = Story(mainargs)
-
-                # Get story from url
-                story.get_text()
+                with c_ig:
+                    cb_ig = st.checkbox(label='Instagram')
                 
-                st.subheader("हिन्दी कहानी")
-                st.text_area(label="भूमिका", height=120, value=re.sub(r'[^\S\n]+', ' ', introduction.get("Hindi")))
-                st.text_area(label="कहानी", height=320, value=re.sub(r'[^\S\n]+', ' ', story.title.get("Hindi") + "\n" + story.text.get("Hindi").strip()))
-                st.text_area(label="अन्त:भाग", height=80, value=re.sub(r'[^\S\n]+', ' ', conclusion.get("Hindi")))
+                with c_tw:
+                    cb_tw = st.checkbox(label='Twitter')
+                
+                with c_yt:
+                    cb_yt = st.checkbox(label='YouTube')
+                
+                with c_mk:
+                    cb_mk = st.checkbox(label='Mock', value=True)
 
-                st.markdown("""<hr style="height:2px;border:none;color:#333;background-color:#333;" /> """, unsafe_allow_html=True)
+                submit_button = st.form_submit_button(label='Submit')
+                if submit_button:
+                    mainargs = {'url': url
+                                , 'fb': cb_fb
+                                , 'ig': cb_ig
+                                , 'tw': cb_tw
+                                , 'yt': cb_yt
+                                , 'mock': cb_mk
+                            }
 
-                # Translate story text and title to English
-                # This is to get visualization text for creating images
-                story.translate()
-                st.subheader("English Story")
-                st.text_area(label="Introduction", height=120, value=re.sub(r'[^\S\n]+', ' ', introduction.get("English")))
-                st.text_area(label="Story", height=300, value=re.sub(r'[^\S\n]+', ' ', story.title.get("English") + "\n" + story.text.get("English") if story.title.get("English") else story.text.get("English")))
-                st.text_area(label="Conclusion", height=80, value=re.sub(r'[^\S\n]+', ' ', conclusion.get("English")))
+                    # Now that we have program arguments, create Story object
+                    # TODO: Use factory pattern to create Story object
+                    if cb_mk:
+                        story = StoryMock(mainargs)
+                    else:
+                        story = Story(mainargs)
 
-                # Get sceneries from translated story text
-                story.get_sceneries()
-                st.subheader("Extracted Sceneries")
-                for key in story.sceneries:
-                    st.text_area(label=key, height=80, value=re.sub(r'[^\S\n]+', ' ', story.sceneries.get(key).get("description")))
+                    # Get story from url
+                    story.get_text()
+                    
+                    with tb_story_h:
+                        with st.form(key='hindi_story_form'):
+                            st.subheader("हिन्दी कहानी")
+                            st.text_area(label="भूमिका", height=120, value=re.sub(r'[^\S\n]+', ' ', introduction.get("Hindi")))
+                            st.text_area(label="कहानी", height=320, value=re.sub(r'[^\S\n]+', ' ', story.title.get("Hindi") + "\n" + story.text.get("Hindi").strip()))
+                            st.text_area(label="अन्त:भाग", height=80, value=re.sub(r'[^\S\n]+', ' ', conclusion.get("Hindi")))
+                            submit_story_h = st.form_submit_button(label='Submit')
+                            if submit_story_h:
+                                st.markdown("Looks OK...Hindi")
 
-                # Get images for the story using the visualization text
-                # story.get_images()
+                    # Translate story text and title to English
+                    # This is to get visualization text for creating images
+                    story.translate()
 
-                # Get audio for the story
-                # story.get_audio('gTTS')
+                    with tb_story_e:
+                        with st.form(key='📖 hindi_story_form'):
+                            st.subheader("English Story")
+                            st.text_area(label="Introduction", height=120, value=re.sub(r'[^\S\n]+', ' ', introduction.get("English")))
+                            st.text_area(label="Story", height=300, value=re.sub(r'[^\S\n]+', ' ', story.title.get("English") + "\n" + story.text.get("English") if story.title.get("English") else story.text.get("English")))
+                            st.text_area(label="Conclusion", height=80, value=re.sub(r'[^\S\n]+', ' ', conclusion.get("English")))
+                            submit_story_e = st.form_submit_button(label='Submit')
+                            if submit_story_e:
+                                st.markdown("Looks OK...English")
 
-                # Get video for the story
-                # story.get_video()
+                    # Get sceneries from translated story text
+                    story.get_sceneries()
 
-                # Publish the story
-                story.publish()
+                    with tb_sceneries:
+                        st.subheader("Scenery Titles and Explainations")
+                        for key in story.sceneries:
+                            st.text_area(label=key, height=80, value=re.sub(r'[^\S\n]+', ' ', story.sceneries.get(key).get("description")))
+
+                    # Get images for the story using the visualization text
+                    story.get_images()
+
+                    with tb_images:
+                        icol1, icol2, icol3, icol4 = st.columns([1, 1, 1, 1])
+
+                        sceneries = list()
+                        for key, value in story.sceneries.items():
+                            tuple_elem = (key, value.get("path"))
+                            sceneries.append(tuple_elem)
+                        
+                        for img in range(0, len(sceneries), 4):
+                            with icol1:
+                                if story.sceneries.get(key).get("path") and img < len(sceneries):
+                                    st.image(sceneries[img][1], caption=sceneries[img][0], width=200)
+                            with icol2:
+                                if story.sceneries.get(key).get("path") and img+1 < len(sceneries):
+                                    st.image(sceneries[img+1][1], caption=sceneries[img+1][0], width=200)
+
+                            with icol3:
+                                if story.sceneries.get(key).get("path") and img+2 < len(sceneries):
+                                    st.image(sceneries[img+2][1], caption=sceneries[img+2][0], width=200)
+
+                            with icol4:
+                                if story.sceneries.get(key).get("path") and img+3 < len(sceneries):
+                                    st.image(sceneries[img+3][1], caption=sceneries[img+3][0], width=200)
+
+                    # Get audio for the story
+                    audio_file = story.get_audio('gTTS')
+
+                    with tb_audio:
+                        st.subheader("Audio")
+                        st.audio(audio_file, format="audio/wav", start_time=0)
+                    
+                    # Get video for the story
+                    video_file = story.get_video()
+
+                    with tb_video:
+                        st.subheader("Video")
+                        st.video(video_file, format="video/mp4", start_time=0)
+                    
+                    # Publish the story
+                    # story.publish()
     elif len(argv) == 2 and (argv[1] == '-h' or argv[1] == '--help'):
         usage(2)
     else:

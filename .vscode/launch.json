@@ -8,17 +8,7 @@
             "program": "${file}",
             "console": "integratedTerminal",
             "args": [
-                "-g", "-t", "-u https://hindikahani.hindi-kavita.com/Ratnamanjari-Sinhasan-Battisi.php"
-            ]
-        },
-        {
-            "name": "debug streamlit",
-            "type": "python",
-            "request": "launch",
-            "program": "/Users/ankur/myprojs/mytts/.venv/bin/streamlit",
-            "args": [
-                "run",
-                "app.py"
+                "-m", "-g", "-t", "-u https://hindikahani.hindi-kavita.com/Ratnamanjari-Sinhasan-Battisi.php"
             ]
         }
     ]
