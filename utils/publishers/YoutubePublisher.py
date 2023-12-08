@@ -71,12 +71,9 @@ def resumable_upload(request):
             time.sleep(sleep_seconds)
 
 class YoutubePublisher(IPublisher):
-    def __init__(self, username: str, password: str) -> None:
-        super().__init__()
+    def __init__(self, credentials: dict) -> None:
+        super().__init__(credentials=credentials)
         
-        self.username = username
-        self.password = password
-
         flow = InstalledAppFlow.from_client_secrets_file(CLIENT_SECRETS_FILE, SCOPES)
         credentials = flow.run_console()
         

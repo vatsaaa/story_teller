@@ -9,13 +9,11 @@ import tweepy
 from utils.publishers.IPublisher import IPublisher
 
 class TwitterPublisher(IPublisher):
-    def __init__(self, consumer_key, consumer_secret, access_token, access_token_secret, temperature: float = 0.5):
-        super().__init__()
+    def __init__(self, credentials: dict) -> None:
+        super().__init__(credentials)
         
-        self.temperature = temperature
-        self.auth = tweepy.OAuthHandler(consumer_key, consumer_secret)
-        self.auth.set_access_token(access_token, access_token_secret)
-        self.api  = tweepy.API(self.auth)
+    def login(self):
+        pass
 
     def build(self, text: str, link: str):
         tweet = None
@@ -25,10 +23,9 @@ class TwitterPublisher(IPublisher):
         template_prompt = """
         {text}
 
-        Please suggest in only one line what does above text do. 
-        Respond in first person. The response must be it catchy, engaging and suitable for a single tweet.
-        Do include link {link} in the response.
-        Please sparingly use phrase 'Dive into the', instead use similar catchy and appealing phrases
+        Please suggest in single line what does above text do. {link} must be included in response.
+        The response must be catchy, engaging, suitable for a tweet and in first person.
+        Please sparingly use phrase 'Dive into the', instead use similar catchy and appealing phrases.
         """
 
         prompt_template = PromptTemplate(
@@ -71,3 +68,6 @@ class TwitterPublisher(IPublisher):
 
     def _tweet_with_image(self, message, image):
         self.api.update_with_media(image, message)
+    
+    def logout(self):
+        pass

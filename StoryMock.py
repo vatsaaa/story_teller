@@ -1,9 +1,11 @@
 import cv2, datetime, itertools
 from os import path, getcwd
 from string import punctuation
+from typing import List
 
 from IStory import IStory
 from utils.mock.inputs import mock_sceneries, mock_text, mock_title
+from utils.publishers.IPublisher import IPublisher
 from utils.Utils import urlify
 
 class StoryMock(IStory):
@@ -66,4 +68,11 @@ class StoryMock(IStory):
     def get_sceneries(self):
         self.sceneries = mock_sceneries
 
+    def publish(self, publishers: List[IPublisher]) -> None:
+        for publisher in publishers:
+            publisher.login()
+
+            publisher.publish()
+            
+            publisher.logout()
 

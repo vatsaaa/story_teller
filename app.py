@@ -6,9 +6,11 @@ import streamlit as st
 # Project imports
 from Story import Story
 from StoryMock import StoryMock
+from utils.Constants import MULTISPACE
 from utils.conclusion import conclusion
 from utils.introduction import introduction
-from utils.publishers.IPublisher import Publishers
+from utils.publishers.IPublisher import PublisherType
+from utils.publishers.PublisherFactory import PublisherFactory
 from utils.Utils import usage
 
 def process_args(args: list):
@@ -32,23 +34,42 @@ def process_args(args: list):
         if opt in ("-h", "--help"):
             usage(2)
         elif opt in ("-f", "--facebook"):
-            retvals['fb'] = Publishers.FACEBOOK
+            retvals['fb'] = PublisherType.FACEBOOK
         elif opt in ("-g", "--instagram"):
-            retvals['ig'] = Publishers.INSTAGRAM
+            retvals['ig'] = PublisherType.INSTAGRAM
         elif opt in ("-i", "--image"):
             retvals['images'] = arg
         elif opt in ("-m", "--mock"):
             retvals['mock'] = True
         elif opt in ("-t", "--twitter"):
-            retvals['tw'] = Publishers.TWITTER
+            retvals['tw'] = PublisherType.TWITTER
         elif opt in ("-u", "--url"):
             retvals['url'] = arg
         elif opt in ("-y", "--youtube"):
-            retvals['yt'] = Publishers.YOUTUBE
+            retvals['yt'] = PublisherType.YOUTUBE
         else:
             usage(4)
 
     return retvals
+
+def get_publishers(progargs: dict):
+    publisters_type = list()
+    publisters_type.append(progargs.get('fb'))
+    publisters_type.append(progargs.get('ig'))
+    publisters_type.append(progargs.get('tw'))
+    publisters_type.append(progargs.get('yt'))
+    
+    publishers = list()
+    for pt in publisters_type:
+        try:
+            p = PublisherFactory.create_publisher(pt)
+        except ValueError as err:
+            print(err)
+            continue
+        
+        publishers.append(p)
+
+    return publishers
 
 def main(progargs: dict):
     # Create Story object and initialize it with the program arguments
@@ -70,15 +91,18 @@ def main(progargs: dict):
     # is used to get images for the story
     story.get_images()
 
+    # Get story audio
+    story.get_audio('gTTS')
+
     # The images we get in step above are used to
     # generate a video for the story
     story.get_video()
 
-    # Get story audio
-    story.get_audio('gTTS')
-
     # Publish the story now
-    # story.publish()
+    publishers = get_publishers(progargs)
+    story.publish(publishers)
+
+    return story.title.get("Hindi"), story.text.get("Hindi"), story.title.get("English"), story.text.get("English")
 
 if __name__ == "__main__":
     mainargs = None
@@ -108,7 +132,7 @@ if __name__ == "__main__":
                     cb_yt = st.checkbox(label='YouTube')
                 
                 with c_mk:
-                    cb_mk = st.checkbox(label='Mock', value=True)
+                    cb_mk = st.checkbox(label='Mock')
 
                 submit_button = st.form_submit_button(label='Submit')
                 if submit_button:
@@ -133,9 +157,9 @@ if __name__ == "__main__":
                     with tb_story_h:
                         with st.form(key='hindi_story_form'):
                             st.subheader("हिन्दी कहानी")
-                            st.text_area(label="भूमिका", height=120, value=re.sub(r'[^\S\n]+', ' ', introduction.get("Hindi")))
-                            st.text_area(label="कहानी", height=320, value=re.sub(r'[^\S\n]+', ' ', story.title.get("Hindi") + "\n" + story.text.get("Hindi").strip()))
-                            st.text_area(label="अन्त:भाग", height=80, value=re.sub(r'[^\S\n]+', ' ', conclusion.get("Hindi")))
+                            st.text_area(label="भूमिका", height=120, value=re.sub(MULTISPACE, ' ', introduction.get("Hindi")))
+                            st.text_area(label="कहानी", height=320, value=re.sub(MULTISPACE, ' ', story.title.get("Hindi") + "\n" + story.text.get("Hindi").strip()))
+                            st.text_area(label="अन्त:भाग", height=80, value=re.sub(MULTISPACE, ' ', conclusion.get("Hindi")))
                             submit_story_h = st.form_submit_button(label='Submit')
                             if submit_story_h:
                                 st.markdown("Looks OK...Hindi")
@@ -145,11 +169,11 @@ if __name__ == "__main__":
                     story.translate()
 
                     with tb_story_e:
-                        with st.form(key='📖 hindi_story_form'):
+                        with st.form(key='english_story_form'):
                             st.subheader("English Story")
-                            st.text_area(label="Introduction", height=120, value=re.sub(r'[^\S\n]+', ' ', introduction.get("English")))
-                            st.text_area(label="Story", height=300, value=re.sub(r'[^\S\n]+', ' ', story.title.get("English") + "\n" + story.text.get("English") if story.title.get("English") else story.text.get("English")))
-                            st.text_area(label="Conclusion", height=80, value=re.sub(r'[^\S\n]+', ' ', conclusion.get("English")))
+                            st.text_area(label="Introduction", height=120, value=re.sub(MULTISPACE, ' ', introduction.get("English")))
+                            st.text_area(label="Story", height=300, value=re.sub(MULTISPACE, ' ', story.title.get("English") + "\n" + story.text.get("English") if story.title.get("English") else story.text.get("English")))
+                            st.text_area(label="Conclusion", height=80, value=re.sub(MULTISPACE, ' ', conclusion.get("English")))
                             submit_story_e = st.form_submit_button(label='Submit')
                             if submit_story_e:
                                 st.markdown("Looks OK...English")
@@ -158,9 +182,10 @@ if __name__ == "__main__":
                     story.get_sceneries()
 
                     with tb_sceneries:
-                        st.subheader("Scenery Titles and Explainations")
-                        for key in story.sceneries:
-                            st.text_area(label=key, height=80, value=re.sub(r'[^\S\n]+', ' ', story.sceneries.get(key).get("description")))
+                        with st.form(key='sceneries_form'):
+                            st.subheader("Scenery Titles and Explainations")
+                            for key in story.sceneries:
+                                st.text_area(label=key, height=80, value=re.sub(MULTISPACE, ' ', story.sceneries.get(key).get("description")))
 
                     # Get images for the story using the visualization text
                     story.get_images()
@@ -193,18 +218,21 @@ if __name__ == "__main__":
                     audio_file = story.get_audio('gTTS')
 
                     with tb_audio:
-                        st.subheader("Audio")
-                        st.audio(audio_file, format="audio/wav", start_time=0)
+                        with st.form(key='audio_form'):
+                            st.subheader("Audio")
+                            st.audio(audio_file, format="audio/wav", start_time=0)
                     
                     # Get video for the story
                     video_file = story.get_video()
 
                     with tb_video:
-                        st.subheader("Video")
-                        st.video(video_file, format="video/mp4", start_time=0)
+                        with st.form(key='video_form'):
+                            st.subheader("Video")
+                            st.video(video_file, format="video/mp4", start_time=0)
                     
                     # Publish the story
-                    # story.publish()
+                    publishers = get_publishers(mainargs)
+                    story.publish(publishers=publishers)
     elif len(argv) == 2 and (argv[1] == '-h' or argv[1] == '--help'):
         usage(2)
     else:

@@ -1,25 +1,52 @@
 from instabot import Bot
-from os import getenv
+from os import getenv, path
+from langchain.chains import LLMChain
+from langchain.prompts import PromptTemplate
 
 # Priject imports
 from utils.publishers.IPublisher import IPublisher
 
 class InstagramPublisher(IPublisher):
-    def __init__(self, username: str=getenv('INSTAGRAM_USER_NAME'), password: str=getenv('INSTAGRAM_USER_PASS')) -> None:
-        super().__init__()
-        
-        self.username = username
-        self.password = password
+    def __init__(self, credentials: dict) -> None:
+        super().__init__(credentials=credentials)
 
         self.bot = Bot()
     
     def login(self) -> None:
-        self.bot.login(username=self.username, password=self.password)
+        self.bot.login(username=self.credentials.get('username'), password=self.credentials.get('password'))
+
+    def build(self) -> None:
+        content = dict()
+        if self.ig: 
+            # TODO: Below line assumes gif file is present
+            # adopt defensive programming here to prevent errors
+            content["image"] = path.join('./videos/', self.story_name + ".gif")
+
+            # Get caption from the story text in English
+            text_to_get_caption_from = self.text.get("English")
+
+            # Set up the translation prompt, grammer (e.g. articles) omitted for brevity
+            caption_template = '''
+            Create a highly engaging summary from the given text between tags <TEXT> and </TEXT>, for publishing as caption on a Instagram post.
+
+            Return only the summary, not the original text. Character Vikram should not be summary.
+
+            <TEXT>{text}</TEXT>
+            '''
+
+            caption_prompt = PromptTemplate(template=caption_template, input_variables=['text'])
+
+            chain2 = LLMChain(llm=self.llm,prompt=caption_prompt)
+
+            # Extract the translated text from the API response
+            input = {'text': text_to_get_caption_from}
+            content["caption"] = chain2.run(input)
     
     def publish(self, content) -> None:
         image = content.get("image")
         caption = content.get("caption")
 
+        # self.build()
         # self.bot.upload_photo(image, caption=caption)
 
     def logout(self) -> None:

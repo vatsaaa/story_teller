@@ -26,7 +26,7 @@ from sys import stderr
 from utils.introduction import introduction
 from utils.conclusion import conclusion
 from utils.Constants import TEXT_TO_IMAGE_URL
-from utils.publishers.IPublisher import IPublisher, Publishers
+from utils.publishers.IPublisher import IPublisher, PublisherType
 from utils.Utils import make_api_request, urlify
 from CustomException import CustomException
 from utils.publishers.InstagramPublisher import InstagramPublisher
@@ -178,14 +178,15 @@ class Story(IStory):
                 with open(output_path, 'wb') as handler:
                     handler.write(img_data)
             
-    def get_audio(self, lib: str) -> None:
+    def get_audio(self, lib: str) -> str:
         final_text = introduction.get("Hindi") + "\n\n" + self.text.get("Hindi") + "\n\n" + conclusion.get("Hindi") + "\n\n"
+        audio_path = path.join('./audios/', self.story_name + ".mp3")
         if lib.lower() == 'gtts':
             gttsLang = 'hi' # Hindi language
 
             replyObj = gTTS(text=final_text, lang=gttsLang, slow=True, pre_processor_funcs=[abbreviations, end_of_line])
 
-            replyObj.save(path.join('./audios/', self.story_name + ".mp3"))
+            replyObj.save(audio_path)
         elif lib.lower() == 'pyttsx3':
             engine = pyttsx3.init()
             voices = filter(lambda v: v.gender == 'VoiceGenderFemale', engine.getProperty('voices'))
@@ -196,8 +197,10 @@ class Story(IStory):
                 engine.runAndWait()
         else:
             raise CustomException("Please use a valid speech processing library. {lib} is not valid!".format(lib=lib))
+        
+        return audio_path
 
-    def get_video(self):
+    def get_video(self) -> str:
         video_name = self.story_name + ".mp4"
         audio_name = self.story_name + ".mp3"
 
@@ -231,76 +234,14 @@ class Story(IStory):
         # Add audio to the video
         audio = editor.AudioFileClip(audio_path)
         video = video.set_audio(audio).set_fps(60)
-        video.write_videofile(video_path)        
+        video.write_videofile(video_path)
+
+        return video_path  
     
-    def _publish_instagram(self) -> None:
-        if not self.ig:
-            return
-
-        content = dict()
-        if self.ig and not self.mock: 
-            # TODO: Below line assumes gif file is present
-            # adopt defensive programming here to prevent errors
-            content["image"] = path.join('./videos/', self.story_name + ".gif")
-
-            # Get caption from the story text in English
-            text_to_get_caption_from = self.text.get("English")
-
-            # Set up the translation prompt, grammer (e.g. articles) omitted for brevity
-            caption_template = '''
-            Create a highly engaging summary from the given text between tags <TEXT> and </TEXT>, for publishing as caption on a Instagram post.
-
-            Return only the summary, not the original text. Character Vikram should not be summary.
-
-            <TEXT>{text}</TEXT>
-            '''
-
-            caption_prompt = PromptTemplate(template=caption_template, input_variables=['text'])
-
-            chain2 = LLMChain(llm=self.llm,prompt=caption_prompt)
-
-            # Extract the translated text from the API response
-            input = {'text': text_to_get_caption_from}
-            content["caption"] = chain2.run(input)
-
-        instagrammer = InstagramPublisher(
-            getenv('INSTAGRAM_USERNAME'),
-            getenv('INSTAGRAM_PASSWORD')
-        )
-        
-        if self.ig and self.mock:
-            content["image"] = path.join('./videos/', self.story_name + ".gif")
-            content["caption"] = "This is a mock caption for the story"
-
-        instagrammer.login()
-        instagrammer.publish(content)
-
-    def _publish_twitter(self, tweet_text: str) -> None:
-        if not self.tw:
-            return
-        
-        tweeter = TwitterPublisher(
-            getenv('TWITTER_CONSUMER_KEY'),
-            getenv('TWITTER_CONSUMER_SECRET'),
-            getenv('TWITTER_ACCESS_TOKEN'),
-            getenv('TWITTER_ACCESS_TOKEN_SECRET')
-        )
-        tweeter.tweet(self.text.get("Hindi"))
-
-    def _publish_youtube(self) -> None:
-        if not self.yt:
-            return
-        
-        youtuber = YoutubePublisher(
-            getenv('YOUTUBE_CLIENT_ID'),
-            getenv('YOUTUBE_CLIENT_SECRET'),
-            getenv('YOUTUBE_REFRESH_TOKEN'),
-            getenv('YOUTUBE_ACCESS_TOKEN')
-        )
-        youtuber.publish(self.text.get("Hindi"))
-
     def publish(self, publishers: List[IPublisher]) -> None:
         for publisher in publishers:
             publisher.login()
+
             publisher.publish()
+            
             publisher.logout()

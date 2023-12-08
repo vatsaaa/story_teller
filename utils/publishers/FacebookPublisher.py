@@ -5,11 +5,8 @@ from os import getenv
 from utils.publishers.IPublisher import IPublisher
 
 class FacebookPublisher(IPublisher):
-    def __init__(self, username: str=getenv('INSTAGRAM_USER_NAME'), password: str=getenv('INSTAGRAM_USER_PASS')) -> None:
-        super().__init__()
-        
-        self.username = username
-        self.password = password
+    def __init__(self, credentials: dict) -> None:
+        super().__init__(credentials=credentials)
     
     def login(self) -> None:
         pass
