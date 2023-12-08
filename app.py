@@ -186,6 +186,9 @@ if __name__ == "__main__":
                             st.subheader("Scenery Titles and Explainations")
                             for key in story.sceneries:
                                 st.text_area(label=key, height=80, value=re.sub(MULTISPACE, ' ', story.sceneries.get(key).get("description")))
+                            submit_sceneries = st.form_submit_button(label='Submit')
+                            if submit_story_h:
+                                st.markdown("Looks OK...Sceneries")
 
                     # Get images for the story using the visualization text
                     story.get_images()
@@ -221,6 +224,9 @@ if __name__ == "__main__":
                         with st.form(key='audio_form'):
                             st.subheader("Audio")
                             st.audio(audio_file, format="audio/wav", start_time=0)
+                            submit_audio = st.form_submit_button(label='Submit')
+                            if submit_audio:
+                                st.markdown("Looks OK...Audio")
                     
                     # Get video for the story
                     video_file = story.get_video()
@@ -229,6 +235,9 @@ if __name__ == "__main__":
                         with st.form(key='video_form'):
                             st.subheader("Video")
                             st.video(video_file, format="video/mp4", start_time=0)
+                            submit_video = st.form_submit_button(label='Submit')
+                            if submit_video:
+                                st.markdown("Looks OK...Video")
                     
                     # Publish the story
                     publishers = get_publishers(mainargs)
