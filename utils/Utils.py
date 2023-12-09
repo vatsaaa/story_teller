@@ -1,7 +1,7 @@
-import json
-import re, requests
+import json, re, requests
+from exceptions.CustomException import CustomException
 
-from CustomException import CustomException
+MULTISPACE = r'[^\S\n]+' # Regex to match multiple spaces
 
 def urlify(s: str):
 

@@ -4,14 +4,12 @@ from os import getenv
 import streamlit as st
 
 # Project imports
-from Story import Story
-from StoryMock import StoryMock
-from utils.Constants import MULTISPACE
+from StoryFactory import StoryFactory
 from utils.conclusion import conclusion
 from utils.introduction import introduction
-from utils.publishers.IPublisher import PublisherType
-from utils.publishers.PublisherFactory import PublisherFactory
-from utils.Utils import usage
+from publishers.IPublisher import PublisherType
+from publishers.PublisherFactory import PublisherFactory
+from utils.Utils import usage, MULTISPACE
 
 def process_args(args: list):
     retvals = {
@@ -73,10 +71,7 @@ def get_publishers(progargs: dict):
 
 def main(progargs: dict):
     # Create Story object and initialize it with the program arguments
-    if progargs.get('mock'):
-        story = StoryMock(progargs)
-    else:
-        story = Story(progargs)
+    story = StoryFactory.create_story(progargs)
 
     # Get story from the website
     story.get_text()
@@ -145,11 +140,7 @@ if __name__ == "__main__":
                             }
 
                     # Now that we have program arguments, create Story object
-                    # TODO: Use factory pattern to create Story object
-                    if cb_mk:
-                        story = StoryMock(mainargs)
-                    else:
-                        story = Story(mainargs)
+                    story = StoryFactory.create_story(progargs=mainargs)
 
                     # Get story from url
                     story.get_text()

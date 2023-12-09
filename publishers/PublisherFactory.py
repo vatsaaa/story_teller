@@ -1,11 +1,11 @@
 from os import getenv
 from typing import List
 
-from utils.publishers.IPublisher import PublisherType
-from utils.publishers.FacebookPublisher import FacebookPublisher
-from utils.publishers.InstagramPublisher import InstagramPublisher
-from utils.publishers.TwitterPublisher import TwitterPublisher
-from utils.publishers.YoutubePublisher import YoutubePublisher
+from publishers.IPublisher import PublisherType
+from publishers.FacebookPublisher import FacebookPublisher
+from publishers.InstagramPublisher import InstagramPublisher
+from publishers.TwitterPublisher import TwitterPublisher
+from publishers.YoutubePublisher import YoutubePublisher
 
 class PublisherFactory:
     @staticmethod

@@ -1,20 +1,15 @@
 from bs4 import BeautifulSoup
-import datetime, dotenv, itertools, json, requests
-from typing import List
-
+import datetime, dotenv, itertools, requests
 from gtts import gTTS
 from gtts.tokenizer.pre_processors import abbreviations, end_of_line
 
 from langchain.chains import LLMChain
-from langchain.chains.summarize import load_summarize_chain
 from langchain.chat_models import ChatOpenAI
 from langchain.prompts import PromptTemplate
 
 from moviepy import editor
 from mutagen.mp3 import MP3
-from mutagen.mp4 import MP4
 
-import openai
 from os import getenv, path
 
 import pathlib, pyttsx3, re
@@ -22,18 +17,15 @@ from PIL import Image
 
 from string import punctuation
 from sys import stderr
+from typing import List
 
-from utils.introduction import introduction
-from utils.conclusion import conclusion
-from utils.Constants import TEXT_TO_IMAGE_URL
-from utils.publishers.IPublisher import IPublisher, PublisherType
-from utils.Utils import make_api_request, urlify
-from CustomException import CustomException
-from utils.publishers.InstagramPublisher import InstagramPublisher
-from utils.publishers.TwitterPublisher import TwitterPublisher
-from utils.publishers.YoutubePublisher import YoutubePublisher
-from utils.mock.inputs import mock_sceneries, mock_text, mock_title
+# Project imports
+from exceptions.CustomException import CustomException
 from IStory import IStory
+from publishers.IPublisher import IPublisher
+from utils.conclusion import conclusion
+from utils.introduction import introduction
+from utils.Utils import make_api_request, urlify, MULTISPACE
 
 dotenv.load_dotenv()
 
@@ -111,11 +103,11 @@ class Story(IStory):
             raise CustomException("Please call .translate() after having fetched the Hindi story!")
 
     def get_sceneries(self):
-        template_prompt = '''Please act as a highly creative and accomplished "visual illustrator" that extracts sceneries from story text given within <STORY> and </STORY> tags. 
-        Detailed explanation of sceneries extracted from the given story text should not have names of the characters, places or other proper nouns. All living beings should should be accompanied by others in the sceneries.
-        The sceneries should set in natural surroundings, with humans, trees, flowers, water bodies, birds, mountains, valleys, Sun, Moon, stars, animals and other living beings in them. Indoor scenes should be spared unless explained in the story.
-        Where possible, especially when outdoors, the explanation of sceneries should have details about climate, weather, time of the day, season, etc.
-        The extracted sceneries should be represented as a Python dictionary where title of the scene is the key and value is a nested python dictionary with the detailed description of the scene as the first element. 
+        template_prompt = '''Please act as a highly creative and accomplished "visual illustrator" that extracts scenes from story. The story must be given within <STORY> and </STORY> tags, if not then please ask for story embeded in <STORY> and </STORY> tags. 
+        Aesthetic scenes are elaborately explained and usually set in natural surroundings. Humans, trees, flowers, ornaments, water bodies, birds, mountains, valleys, Sun, Moon, stars, animals and other living beings are focused upon.
+        Details about season, climate, weather, time of the day, colours and more are important.
+        Scenes extracted from given story should not have names of characters, places or any other proper nouns. In a scene, no living being should be alone.
+        Represented the extracted scenes as a Python dictionary where title of the scene is the key and value is a nested python dictionary with the detailed description of the scene as the first element. 
         The second element in the nested dictionary is a list of sentiments that can be used to explain the scenery in the detailed description. 
         Nothing else is required in the output Python dictionary.
 
@@ -161,7 +153,7 @@ class Story(IStory):
                 'Accept': 'text/plain'
             }
 
-            response = make_api_request(TEXT_TO_IMAGE_URL, data, headers)
+            response = make_api_request(getenv('TEXT_TO_IMAGE_URL'), data, headers)
             if response.status_code == 200 and response.json().get('status').lower() != 'success':
                 raise CustomException("Error: Image generation from Stable Diffusion did not work as expected!")
 

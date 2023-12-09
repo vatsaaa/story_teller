@@ -4,8 +4,8 @@ from string import punctuation
 from typing import List
 
 from IStory import IStory
+from publishers.IPublisher import IPublisher
 from utils.mock.inputs import mock_sceneries, mock_text, mock_title
-from utils.publishers.IPublisher import IPublisher
 from utils.Utils import urlify
 
 class StoryMock(IStory):

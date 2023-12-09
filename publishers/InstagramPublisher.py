@@ -4,7 +4,7 @@ from langchain.chains import LLMChain
 from langchain.prompts import PromptTemplate
 
 # Priject imports
-from utils.publishers.IPublisher import IPublisher
+from publishers.IPublisher import IPublisher
 
 class InstagramPublisher(IPublisher):
     def __init__(self, credentials: dict) -> None:

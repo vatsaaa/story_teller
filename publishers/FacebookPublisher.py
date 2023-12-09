@@ -2,7 +2,7 @@ from instabot import Bot
 from os import getenv
 
 # Priject imports
-from utils.publishers.IPublisher import IPublisher
+from publishers.IPublisher import IPublisher
 
 class FacebookPublisher(IPublisher):
     def __init__(self, credentials: dict) -> None:
