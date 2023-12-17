@@ -4,7 +4,7 @@ from os import getenv
 import streamlit as st
 
 # Project imports
-from StoryFactory import StoryFactory
+from story.StoryFactory import StoryFactory
 from utils.conclusion import conclusion
 from utils.introduction import introduction
 from publishers.IPublisher import PublisherType
