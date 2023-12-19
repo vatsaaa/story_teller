@@ -154,44 +154,6 @@ if __name__ == "__main__":
                 # Set story object in session state
                 st.session_state['story'] = story
                     
-                    # for img in range(0, len(sceneries), 4):
-                    #     with icol1:
-                    #         if story.sceneries.get(key).get("path") and img < len(sceneries):
-                    #             st.image(sceneries[img][1], caption=sceneries[img][0], width=200)
-                    #     with icol2:
-                    #         if story.sceneries.get(key).get("path") and img+1 < len(sceneries):
-                    #             st.image(sceneries[img+1][1], caption=sceneries[img+1][0], width=200)
-
-                        # with icol3:
-                        #     if story.sceneries.get(key).get("path") and img+2 < len(sceneries):
-                        #         st.image(sceneries[img+2][1], caption=sceneries[img+2][0], width=200)
-
-                        # with icol4:
-                        #     if story.sceneries.get(key).get("path") and img+3 < len(sceneries):
-                        #         st.image(sceneries[img+3][1], caption=sceneries[img+3][0], width=200)
-
-                # Get audio for the story
-                # audio_file = story.get_audio('gTTS')
-
-                # with tb_audio:
-                #     with st.form(key='audio_form'):
-                #         st.subheader("Audio")
-                #         st.audio(audio_file, format="audio/wav", start_time=0)
-                #         submit_audio = st.form_submit_button(label='Submit')
-                #         if submit_audio:
-                #             st.markdown("Looks OK...Audio")
-                
-                # # Get video for the story
-                # video_file = story.get_video()
-
-                # with tb_video:
-                #     with st.form(key='video_form'):
-                #         st.subheader("Video")
-                #         st.video(video_file, format="video/mp4", start_time=0)
-                #         submit_video = st.form_submit_button(label='Submit')
-                #         if submit_video:
-                #             st.markdown("Looks OK...Video")
-                
                 # Publish the story
                 # publishers = get_publishers(mainargs)
                 # story.publish(publishers=publishers)
