@@ -2,10 +2,12 @@ from bs4 import BeautifulSoup
 import datetime, dotenv, itertools, requests
 from gtts import gTTS
 from gtts.tokenizer.pre_processors import abbreviations, end_of_line
+import json
 
 from langchain.chains import LLMChain
 from langchain.chat_models import ChatOpenAI
 from langchain.prompts import PromptTemplate
+from langchain.text_splitter import RecursiveCharacterTextSplitter
 
 from moviepy import editor
 from mutagen.mp3 import MP3
@@ -21,30 +23,30 @@ from typing import List
 
 # Project imports
 from exceptions.CustomException import CustomException
-from IStory import IStory
+from story.IStory import IStory
 from publishers.IPublisher import IPublisher
 from utils.conclusion import conclusion
 from utils.introduction import introduction
-from utils.Utils import make_api_request, urlify, MULTISPACE
+from utils.Utils import make_api_request, num_tokens_from_string, urlify, MULTISPACE
 
 dotenv.load_dotenv()
 
 class Story(IStory):
     id_obj = itertools.count(1)
 
-    def __init__(self, progargs: dict) -> None:
+    def __init__(self, progargs: dict=None) -> None:
         super().__init__()
         
         self.id = next(Story.id_obj)
         self.date = datetime.datetime.today().strftime('%Y-%m-%d')
 
-        self.fb = progargs.get('fb')
-        self.ig = progargs.get('ig')
-        self.tw = progargs.get('tw')
-        self.yt = progargs.get('yt')
-        self.story_name = None
+        self.fb = progargs.get('fb', None)
+        self.ig = progargs.get('ig', None)
+        self.tw = progargs.get('tw', None)
+        self.yt = progargs.get('yt', None)
+        self.name = None
         
-        self.url = progargs.get('url')
+        self.url = progargs.get('url', None)
         self.mock = False
         self.text = {
             "Hindi": None,
@@ -54,11 +56,11 @@ class Story(IStory):
             "Hindi": None,
             "English": None
         }
-        self.sceneries = dict()
+        self.sceneries = dict(dict())
         self.llm = ChatOpenAI(temperature=0.4)
 
     def get_text(self):
-        pattern = re.compile(r':\s$', re.MULTILINE)
+        COLONPATTERN = re.compile(r':\s$', re.MULTILINE)
 
         response = requests.get(self.url)
         response.raise_for_status()
@@ -68,47 +70,59 @@ class Story(IStory):
         paragraphs = soup.find_all('p')
 
         self.title["Hindi"] = [h.get_text() for h in headings][0].split(":")[0]
-        self.text["Hindi"] = [re.sub(pattern, '-', p.get_text().replace("दु:खी", "दुखी").replace("छ:", "छह")) for p in paragraphs][0].split(":")[0]
+        self.text["Hindi"] = [re.sub(COLONPATTERN, '-', p.get_text().replace("दु:", "दु").replace("छ:", "छह")) for p in paragraphs][0].split(":")[0]
+        # self.text["Hindi"] = re.sub(r'\n+', '\n', self.text.get("Hindi"))
 
         # Set the story name using the title
-        self.story_name = self.title.get("Hindi").replace(" ", '').translate(str.maketrans('', '', punctuation))
+        self.name = self.title.get("Hindi").replace(" ", '').translate(str.maketrans('', '', punctuation))
 
     def translate(self) -> None:
+        print("Translating story to English...")
         if self.text.get("Hindi"):
             text_to_translate = self.text.get("Hindi")
 
             # Set up the translation prompt, grammer (e.g. articles) omitted for brevity
             translation_template = '''
-            Please act as a highly proficient translator for {from_lang} and {to_lang} languages.
-            Between tags <TEXT> and </TEXT>, is the text of a popular story for kids in {from_lang} language. Please translate it to {to_lang} language.
+            You are a highly proficient translator for {from_lang} and {to_lang} languages.
+            Between tags <TEXT> and </TEXT>, is text of a popular story for kids in {from_lang} language. Please translate it to {to_lang} language.
             
-            Return only the translation in {to_lang} language, not any text in original {from_lang} language.
+            Only return the translation in {to_lang} language, nothing else. Do not embed the translation in <TEXT> and </TEXT> tags.
 
-            Ensure that returned text is highly engaging and suitable for a youtube channel higly popular amongst kids of 5 years to 14 years.
+            Returned text must be highly engaging and suitable for a youtube channel higly popular amongst kids of 5 years to 14 years.
 
             <TEXT>{text}</TEXT>
             '''
 
+            ## Create chunks of text to translate
+            print("Splitting text into chunks...")
+            text_splitter = RecursiveCharacterTextSplitter(chunk_size=3300
+                                                           , chunk_overlap=10
+                                                           , length_function=len
+                                                           , separators = ['\n', '।\s$'])
+            chunks = text_splitter.split_text(text=text_to_translate)
+
+            ## Translate each chunk
             text_prompt = PromptTemplate(template=translation_template, input_variables=['from_lang', 'to_lang', 'text'])
-
             chain2 = LLMChain(llm=self.llm,prompt=text_prompt)
+            translated_text: list[str] = []
+            for chunk_num, chunk in enumerate(chunks):
+                # Extract the translated text from the API response
+                input = {'from_lang': "Hindi", 'to_lang': "English", 'text': chunk}
+                translated_text.append(chain2.run(input))
 
-            # Extract the translated text from the API response
-            input = {'from_lang': "Hindi", 'to_lang': "English", 'text': text_to_translate}
-            translated_text = chain2.run(input)
-
-            # Print the translated text
-            self.text["English"] = translated_text
+            self.text["English"] = " ".join(translated_text)
         else:
             raise CustomException("Please call .translate() after having fetched the Hindi story!")
 
     def get_sceneries(self):
-        template_prompt = '''Please act as a highly creative and accomplished "visual illustrator" that extracts scenes from story. The story must be given within <STORY> and </STORY> tags, if not then please ask for story embeded in <STORY> and </STORY> tags. 
+        print("Getting description for sceneries...")
+        template_prompt = '''You are a highly creative, accomplished and expert "visual illustrator" that extracts sceneries from text of ancient Indian stories, given within <STORY> and </STORY> tags.
         Aesthetic scenes are elaborately explained and usually set in natural surroundings. Humans, trees, flowers, ornaments, water bodies, birds, mountains, valleys, Sun, Moon, stars, animals and other living beings are focused upon.
-        Details about season, climate, weather, time of the day, colours and more are important.
+        Details about season, climate, weather, time of the day, colours are important.
         Scenes extracted from given story should not have names of characters, places or any other proper nouns. In a scene, no living being should be alone.
-        Represented the extracted scenes as a Python dictionary where title of the scene is the key and value is a nested python dictionary with the detailed description of the scene as the first element. 
-        The second element in the nested dictionary is a list of sentiments that can be used to explain the scenery in the detailed description. 
+        Represent the extracted scenes as a Python dictionary. Keys in this dictionary have meaningful names extracted from the scenery description like "Vikramaditya's Court", "Hut with beautiful lawns". 
+        The value for the key in that dictionary is a nested python dictionary with first element as detailed description of the scenery.
+        The second element in the nested dictionary is a list of adjectives and sentiments that can be used to explain the scenery.
         Nothing else is required in the output Python dictionary.
 
         <STORY>{story}</STORY>
@@ -135,7 +149,7 @@ class Story(IStory):
             output_path = None
 
             data = {
-                'key': getenv('STABLEDIFFUSION_API_KEY_99'),
+                'key': getenv('STABLEDIFFUSION_API_KEY_01'),
                 'width': width,
                 'height': height,
                 'prompt': scenery_prompt,
@@ -165,14 +179,19 @@ class Story(IStory):
             # TODO: Use make_api_request here?
             img_data = requests.get(image_url).content if image_url else None
             if img_data:
-                img_name = './images/', urlify(scenery_title) + '.png'
+                scenery_title = urlify(scenery_title)
+                img_name = './images/' + scenery_title + '.png'
                 output_path = path.join(img_name)
                 with open(output_path, 'wb') as handler:
                     handler.write(img_data)
+            else:
+                print("Error: Image data is empty!")
             
     def get_audio(self, lib: str) -> str:
+        print("Begining to process audio...")
         final_text = introduction.get("Hindi") + "\n\n" + self.text.get("Hindi") + "\n\n" + conclusion.get("Hindi") + "\n\n"
-        audio_path = path.join('./audios/', self.story_name + ".mp3")
+        audio_path = './audios/' + self.name + ".mp3"
+        audio_path = path.join('./audios/', self.name + ".mp3")
         if lib.lower() == 'gtts':
             gttsLang = 'hi' # Hindi language
 
@@ -193,8 +212,9 @@ class Story(IStory):
         return audio_path
 
     def get_video(self) -> str:
-        video_name = self.story_name + ".mp4"
-        audio_name = self.story_name + ".mp3"
+        print("Begining to process video...")
+        video_name = self.name + ".mp4"
+        audio_name = self.name + ".mp3"
 
         video_path = path.join('./videos', video_name)
         audio_path = path.join('./audios', audio_name)
@@ -205,7 +225,6 @@ class Story(IStory):
         
         # Glob the images and stitch them to get the gif
         path_images = pathlib.Path('./images/')
-        # print("Path images: ", path_images.absolute())
         images = list(path_images.absolute().glob('*.png'))
         image_list = list()
         
@@ -213,8 +232,7 @@ class Story(IStory):
             image = Image.open(image_name).resize((800, 800), Image.Resampling.LANCZOS)
             image_list.append(image)
         
-        print("Number of images: ", len(image_list)
-                , "\nAudio length: ", audio_length)
+        print("Number of images: ", len(image_list), "\nAudio length: ", audio_length)
         duration = int(audio_length / len(image_list)) * 1000
 
         # Creating the gif

@@ -1,9 +1,10 @@
-import cv2, datetime, itertools
+import copy, cv2, datetime, itertools
 from os import path, getcwd
 from string import punctuation
 from typing import List
 
-from IStory import IStory
+from story.IStory import IStory
+from story.Story import Story # Used in get_images()
 from publishers.IPublisher import IPublisher
 from utils.mock.inputs import mock_sceneries, mock_text, mock_title
 from utils.Utils import urlify
@@ -11,7 +12,7 @@ from utils.Utils import urlify
 class StoryMock(IStory):
     id_obj = itertools.count(1)
 
-    def __init__(self, progargs: dict) -> None:
+    def __init__(self, progargs: dict=None) -> None:
         super().__init__()
 
         self.id = next(StoryMock.id_obj)
@@ -38,9 +39,6 @@ class StoryMock(IStory):
         pass
 
     def get_images(self):
-        img_data = None
-        output_path = None
-
         for key in self.sceneries:
             scenery_title = key
 

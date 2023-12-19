@@ -1,4 +1,3 @@
-from instabot import Bot
 from os import getenv, path
 from langchain.chains import LLMChain
 from langchain.prompts import PromptTemplate
@@ -9,11 +8,9 @@ from publishers.IPublisher import IPublisher
 class InstagramPublisher(IPublisher):
     def __init__(self, credentials: dict) -> None:
         super().__init__(credentials=credentials)
-
-        self.bot = Bot()
     
     def login(self) -> None:
-        self.bot.login(username=self.credentials.get('username'), password=self.credentials.get('password'))
+        pass
 
     def build(self) -> None:
         content = dict()
@@ -46,9 +43,5 @@ class InstagramPublisher(IPublisher):
         image = content.get("image")
         caption = content.get("caption")
 
-        # self.build()
-        # self.bot.upload_photo(image, caption=caption)
-
     def logout(self) -> None:
-        self.bot.logout()
-    
+        pass    
