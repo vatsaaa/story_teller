@@ -53,3 +53,10 @@ You can change the URL with:
 git remote set-url origin git+ssh://git@github.com/username/reponame.git
 
 More details: https://www.youtube.com/watch?v=TCcWwUgQe8s
+
+Type of links that this should parse and get the story from: https://hindikahani.hindi-kavita.com/Prarambh-Ki-Kahani-Betal-Pachchisi.php
+
+
+How to run: streamlit run app.py
+
+Run unit tests: python3 -m unittest discover -s tests

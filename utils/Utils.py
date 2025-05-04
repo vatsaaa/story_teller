@@ -44,7 +44,7 @@ def make_api_request(url, data, headers):
         
         return response
     except requests.exceptions.RequestException as e:
-        raise CustomException("API request failed") from e
+        raise CustomException("API request failed", details={"url": url, "error": str(e)})
     
 def num_tokens_from_string(string: str, encoding_name: str) -> int:
     """Returns the number of tokens in a text string."""

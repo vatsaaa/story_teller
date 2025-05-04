@@ -5,7 +5,7 @@ from gtts.tokenizer.pre_processors import abbreviations, end_of_line
 import json
 
 from langchain.chains import LLMChain
-from langchain.chat_models import ChatOpenAI
+from langchain_community.chat_models import ChatOpenAI
 from langchain.prompts import PromptTemplate
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 
@@ -104,15 +104,17 @@ class Story(IStory):
             ## Translate each chunk
             text_prompt = PromptTemplate(template=translation_template, input_variables=['from_lang', 'to_lang', 'text'])
             chain2 = LLMChain(llm=self.llm,prompt=text_prompt)
-            translated_text: list[str] = []
-            for chunk_num, chunk in enumerate(chunks):
-                # Extract the translated text from the API response
-                input = {'from_lang': "Hindi", 'to_lang': "English", 'text': chunk}
-                translated_text.append(chain2.run(input))
+            try:
+                translated_text: list[str] = []
+                for chunk_num, chunk in enumerate(chunks):
+                    input = {'from_lang': "Hindi", 'to_lang': "English", 'text': chunk}
+                    translated_text.append(chain2.run(input))
 
-            self.text["English"] = " ".join(translated_text)
+                self.text["English"] = " ".join(translated_text)
+            except Exception as e:
+                raise CustomException("Translation failed", details={"error": str(e)})
         else:
-            raise CustomException("Please call .translate() after having fetched the Hindi story!")
+            raise CustomException("Hindi story text is missing. Please fetch the story first.")
 
     def get_sceneries(self):
         print("Getting description for sceneries...")
@@ -167,47 +169,53 @@ class Story(IStory):
                 'Accept': 'text/plain'
             }
 
-            response = make_api_request(getenv('TEXT_TO_IMAGE_URL'), data, headers)
-            if response.status_code == 200 and response.json().get('status').lower() != 'success':
-                raise CustomException("Error: Image generation from Stable Diffusion did not work as expected!")
+            try:
+                response = make_api_request(getenv('TEXT_TO_IMAGE_URL'), data, headers)
+                if response.status_code == 200 and response.json().get('status').lower() != 'success':
+                    raise CustomException("Image generation failed", details={"status": response.json().get('status')})
 
-            # TODO: Use a for loop instead of 0 index
-            # We use 0 for now as only one
-            # image is requested by default
-            image_url = response.json().get('output')[0]
+                # TODO: Use a for loop instead of 0 index
+                # We use 0 for now as only one
+                # image is requested by default
+                image_url = response.json().get('output')[0]
 
-            # TODO: Use make_api_request here?
-            img_data = requests.get(image_url).content if image_url else None
-            if img_data:
-                scenery_title = urlify(scenery_title)
-                img_name = './images/' + scenery_title + '.png'
-                output_path = path.join(img_name)
-                with open(output_path, 'wb') as handler:
-                    handler.write(img_data)
-            else:
-                print("Error: Image data is empty!")
+                # TODO: Use make_api_request here?
+                img_data = requests.get(image_url).content if image_url else None
+                if img_data:
+                    scenery_title = urlify(scenery_title)
+                    img_name = './images/' + scenery_title + '.png'
+                    output_path = path.join(img_name)
+                    with open(output_path, 'wb') as handler:
+                        handler.write(img_data)
+                else:
+                    print("Error: Image data is empty!")
+            except Exception as e:
+                raise CustomException("Error during image generation", details={"error": str(e)})
             
     def get_audio(self, lib: str) -> str:
         print("Begining to process audio...")
         final_text = introduction.get("Hindi") + "\n\n" + self.text.get("Hindi") + "\n\n" + conclusion.get("Hindi") + "\n\n"
         audio_path = './audios/' + self.name + ".mp3"
         audio_path = path.join('./audios/', self.name + ".mp3")
-        if lib.lower() == 'gtts':
-            gttsLang = 'hi' # Hindi language
+        try:
+            if lib.lower() == 'gtts':
+                gttsLang = 'hi' # Hindi language
 
-            replyObj = gTTS(text=final_text, lang=gttsLang, slow=True, pre_processor_funcs=[abbreviations, end_of_line])
+                replyObj = gTTS(text=final_text, lang=gttsLang, slow=True, pre_processor_funcs=[abbreviations, end_of_line])
 
-            replyObj.save(audio_path)
-        elif lib.lower() == 'pyttsx3':
-            engine = pyttsx3.init()
-            voices = filter(lambda v: v.gender == 'VoiceGenderFemale', engine.getProperty('voices'))
-            for voice in enumerate(voices):
-                print(voice[0], "Voice ID: ", voice[1].id, voice[1].languages[0])
-                engine.setProperty('voice', voice[1].id)
-                engine.say(final_text)
-                engine.runAndWait()
-        else:
-            raise CustomException("Please use a valid speech processing library. {lib} is not valid!".format(lib=lib))
+                replyObj.save(audio_path)
+            elif lib.lower() == 'pyttsx3':
+                engine = pyttsx3.init()
+                voices = filter(lambda v: v.gender == 'VoiceGenderFemale', engine.getProperty('voices'))
+                for voice in enumerate(voices):
+                    print(voice[0], "Voice ID: ", voice[1].id, voice[1].languages[0])
+                    engine.setProperty('voice', voice[1].id)
+                    engine.say(final_text)
+                    engine.runAndWait()
+            else:
+                raise CustomException("Please use a valid speech processing library. {lib} is not valid!".format(lib=lib))
+        except Exception as e:
+            raise CustomException("Audio generation failed", details={"error": str(e)})
         
         return audio_path
 
@@ -219,32 +227,35 @@ class Story(IStory):
         video_path = path.join('./videos', video_name)
         audio_path = path.join('./audios', audio_name)
 
-        # Read the story audio mp3 file and set its length
-        story_audio = MP3(audio_path)
-        audio_length = round(story_audio.info.length) + 1
-        
-        # Glob the images and stitch them to get the gif
-        path_images = pathlib.Path('./images/')
-        images = list(path_images.absolute().glob('*.png'))
-        image_list = list()
-        
-        for image_name in images:
-            image = Image.open(image_name).resize((800, 800), Image.Resampling.LANCZOS)
-            image_list.append(image)
-        
-        print("Number of images: ", len(image_list), "\nAudio length: ", audio_length)
-        duration = int(audio_length / len(image_list)) * 1000
+        try:
+            # Read the story audio mp3 file and set its length
+            story_audio = MP3(audio_path)
+            audio_length = round(story_audio.info.length) + 1
+            
+            # Glob the images and stitch them to get the gif
+            path_images = pathlib.Path('./images/')
+            images = list(path_images.absolute().glob('*.png'))
+            image_list = list()
+            
+            for image_name in images:
+                image = Image.open(image_name).resize((800, 800), Image.Resampling.LANCZOS)
+                image_list.append(image)
+            
+            print("Number of images: ", len(image_list), "\nAudio length: ", audio_length)
+            duration = int(audio_length / len(image_list)) * 1000
 
-        # Creating the gif
-        image_list[0].save(path.join('./videos/',"temp.gif"),save_all=True,append_images=image_list[1:],duration=duration)
-        
-        # Getting the vieo from the gif
-        video = editor.VideoFileClip(path.join('./videos/', "temp.gif"))
+            # Creating the gif
+            image_list[0].save(path.join('./videos/',"temp.gif"),save_all=True,append_images=image_list[1:],duration=duration)
+            
+            # Getting the vieo from the gif
+            video = editor.VideoFileClip(path.join('./videos/', "temp.gif"))
 
-        # Add audio to the video
-        audio = editor.AudioFileClip(audio_path)
-        video = video.set_audio(audio).set_fps(60)
-        video.write_videofile(video_path)
+            # Add audio to the video
+            audio = editor.AudioFileClip(audio_path)
+            video = video.set_audio(audio).set_fps(60)
+            video.write_videofile(video_path)
+        except Exception as e:
+            raise CustomException("Video generation failed", details={"error": str(e)})
 
         return video_path  
     
