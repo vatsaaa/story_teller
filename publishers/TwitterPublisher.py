@@ -4,6 +4,7 @@ from langchain.prompts import PromptTemplate
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 import openai
 import tweepy
+from openai import OpenAI
 
 # Project imports
 from publishers.IPublisher import IPublisher
@@ -18,7 +19,7 @@ class TwitterPublisher(IPublisher):
     def build(self, text: str, link: str):
         tweet = None
         docs = None
-        llm = ChatOpenAI(model='gpt-3.5-turbo-1106', temperature=self.temperature)
+        llm = OpenAI(base_url="https://openrouter.ai/api/v1", api_key=getenv('OPENROUTER_API_KEY'))
 
         template_prompt = """
         {text}

@@ -1,6 +1,7 @@
 from http import client
 import httplib2
 import os, random, time
+from unittest.mock import Mock
 
 from google.oauth2 import credentials
 from google_auth_oauthlib import flow
@@ -73,6 +74,9 @@ def resumable_upload(request):
 class YoutubePublisher(IPublisher):
     def __init__(self, credentials: dict) -> None:
         super().__init__(credentials=credentials)
+        
+        # Mocked service object to bypass actual API calls
+        self.youtube_service = Mock()
         
         flow = InstalledAppFlow.from_client_secrets_file(CLIENT_SECRETS_FILE, SCOPES)
         credentials = flow.run_local_server(port=0)

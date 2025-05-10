@@ -38,14 +38,20 @@ def chunked_tokens(text, encoding_name, chunk_length):
 def make_api_request(url, data, headers):
     try:
         response = requests.post(url=url, data=json.dumps(data), headers=headers)
-        print("Called {url} ".format(url=url))
+        print(f"Called {url}")
+        print(f"Response Status Code: {response.status_code}")
+        print(f"Response Content: {response.text}")
         response.raise_for_status()
-        print(response.json())
-        
         return response
     except requests.exceptions.RequestException as e:
-        raise CustomException("API request failed", details={"url": url, "error": str(e)})
-    
+        error_details = {
+            "url": url,
+            "status_code": response.status_code if 'response' in locals() else None,
+            "response_text": response.text if 'response' in locals() else None,
+            "error": str(e)
+        }
+        raise CustomException("API request failed", details=error_details)
+
 def num_tokens_from_string(string: str, encoding_name: str) -> int:
     """Returns the number of tokens in a text string."""
     encoding = tiktoken.encoding_for_model(encoding_name)

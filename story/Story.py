@@ -20,6 +20,7 @@ from PIL import Image
 from string import punctuation
 from sys import stderr
 from typing import List
+import ast
 
 # Project imports
 from exceptions.CustomException import CustomException
@@ -57,7 +58,7 @@ class Story(IStory):
             "English": None
         }
         self.sceneries = dict(dict())
-        self.llm = ChatOpenAI(temperature=0.4)
+        self.llm = ChatOpenAI(temperature=0.4, api_key=getenv('OPENROUTER_API_KEY'), base_url="https://openrouter.ai/api/v1")
 
     def get_text(self):
         COLONPATTERN = re.compile(r':\s$', re.MULTILINE)
@@ -118,7 +119,7 @@ class Story(IStory):
 
     def get_sceneries(self):
         print("Getting description for sceneries...")
-        template_prompt = '''You are a highly creative, accomplished and expert "visual illustrator" that extracts sceneries from text of ancient Indian stories, given within <STORY> and </STORY> tags.
+        template_prompt = '''Act as highly creative, accomplished and expert "visual illustrator" that extracts sceneries from text of ancient Indian stories, given within <STORY> and </STORY> tags.
         Aesthetic scenes are elaborately explained and usually set in natural surroundings. Humans, trees, flowers, ornaments, water bodies, birds, mountains, valleys, Sun, Moon, stars, animals and other living beings are focused upon.
         Details about season, climate, weather, time of the day, colours are important.
         Scenes extracted from given story should not have names of characters, places or any other proper nouns. In a scene, no living being should be alone.
@@ -132,17 +133,28 @@ class Story(IStory):
 
         sceneries_prompt = PromptTemplate(template=template_prompt, input_variables=['story'])
 
-        chain2 = LLMChain(llm=self.llm,prompt=sceneries_prompt)
+        chain2 = LLMChain(llm=self.llm, prompt=sceneries_prompt)
         input = {'story': self.text.get("English")}
-        
-        self.sceneries = chain2.run(input)
+
+        try:
+            sceneries_output = chain2.run(input)
+            # Parse the output to ensure it is a dictionary
+            self.sceneries = ast.literal_eval(sceneries_output) if isinstance(sceneries_output, str) else sceneries_output
+        except Exception as e:
+            raise CustomException("Failed to get sceneries", details={"error": str(e)})
     
     def get_images(self, width: int = 512, height: int = 512, count: int = 1) -> None:        
+        t2i_api_key = getenv('STABLEDIFFUSION_API_KEY')
+        if not t2i_api_key:
+            raise CustomException("STABLEDIFFUSION_API_KEY is not set. Please configure it to use Stable Diffusion.")
+
+        if not getenv('TEXT_TO_IMAGE_URL'):
+            raise CustomException("TEXT_TO_IMAGE_URL is not set. Please configure it to use Stable Diffusion.")
+
         for key in self.sceneries:
             scenery_title = key
-            scenery_prompt = '''Create a hyper-realistic scene described in these words: {description}. 
-                                The lighting is cinematic and the photograph is ultra-detailed, with 8k resolution and sharp focus. 
-                                The scene sentiments are explained by words such as {sentiments}.
+            scenery_prompt = '''Create ultra-detailed and hyper-realistic scene with cinematic lightning, 8k resolution and sharp focus, described in these words: {description}. 
+                                Scene sentiments are explained by words such as {sentiments}.
                             '''.format(description=self.sceneries.get(key).get("description"), 
                                         sentiments=self.sceneries.get(key).get("sentiments"))
 
@@ -151,35 +163,31 @@ class Story(IStory):
             output_path = None
 
             data = {
-                'key': getenv('STABLEDIFFUSION_API_KEY_01'),
+                'prompt': scenery_prompt,
+                "negative_prompt": "(worst quality:2), (low quality:2), (normal quality:2), (jpeg artifacts), (blurry), (duplicate), (morbid), (mutilated), (out of frame), (extra limbs), (bad anatomy), (disfigured), (deformed), (cross-eye), (glitch), (oversaturated), (overexposed), (underexposed), (bad proportions), (bad hands), (bad feet), (cloned face), (long neck), (missing arms), (missing legs), (extra fingers), (fused fingers), (poorly drawn hands), (poorly drawn face), (mutation), (deformed eyes), watermark, text, signature, grainy, tiling, ugly, blurry eyes, noisy image, bad lighting, unnatural skin, asymmetry",
                 'width': width,
                 'height': height,
-                'prompt': scenery_prompt,
-                'negative_prompt': 'multiple images of the same scene',
-                "enhance_prompt": "no",
-                'guidance_scale': 8,
-                "safety_checker": "no",
-                'multi_lingual': 'no',
-                'panorama': 'no',
-                "samples": str(count)
+                'samples': count,
+                "safety_checker": 0,
+                "base64": 0,
+                'key': t2i_api_key
             }
 
             headers = {
                 'Content-type': 'application/json',
-                'Accept': 'text/plain'
+                'Accept': 'application/json'
             }
 
             try:
-                response = make_api_request(getenv('TEXT_TO_IMAGE_URL'), data, headers)
-                if response.status_code == 200 and response.json().get('status').lower() != 'success':
-                    raise CustomException("Image generation failed", details={"status": response.json().get('status')})
+                url = "https://modelslab.com/api/v6/realtime/text2img"
+                response = make_api_request(url, data, headers)
 
-                # TODO: Use a for loop instead of 0 index
-                # We use 0 for now as only one
-                # image is requested by default
-                image_url = response.json().get('output')[0]
+                response_json = response.json()
+                if not response_json or 'output' not in response_json or not response_json['output']:
+                    raise CustomException("Image generation failed", details={"error": "No images returned by the API or invalid response format."})
 
-                # TODO: Use make_api_request here?
+                image_url = response_json['output'][0]  # Safely access the first image URL
+
                 img_data = requests.get(image_url).content if image_url else None
                 if img_data:
                     scenery_title = urlify(scenery_title)
@@ -188,7 +196,7 @@ class Story(IStory):
                     with open(output_path, 'wb') as handler:
                         handler.write(img_data)
                 else:
-                    print("Error: Image data is empty!")
+                    raise CustomException("Image data is empty!", details={"image_url": image_url})
             except Exception as e:
                 raise CustomException("Error during image generation", details={"error": str(e)})
             
@@ -197,25 +205,28 @@ class Story(IStory):
         final_text = introduction.get("Hindi") + "\n\n" + self.text.get("Hindi") + "\n\n" + conclusion.get("Hindi") + "\n\n"
         audio_path = './audios/' + self.name + ".mp3"
         audio_path = path.join('./audios/', self.name + ".mp3")
-        try:
-            if lib.lower() == 'gtts':
-                gttsLang = 'hi' # Hindi language
 
-                replyObj = gTTS(text=final_text, lang=gttsLang, slow=True, pre_processor_funcs=[abbreviations, end_of_line])
+        # Check if the audio file exists before proceeding
+        if not path.exists(audio_path):
+            try:
+                if lib.lower() == 'gtts':
+                    gttsLang = 'hi' # Hindi language
 
-                replyObj.save(audio_path)
-            elif lib.lower() == 'pyttsx3':
-                engine = pyttsx3.init()
-                voices = filter(lambda v: v.gender == 'VoiceGenderFemale', engine.getProperty('voices'))
-                for voice in enumerate(voices):
-                    print(voice[0], "Voice ID: ", voice[1].id, voice[1].languages[0])
-                    engine.setProperty('voice', voice[1].id)
-                    engine.say(final_text)
-                    engine.runAndWait()
-            else:
-                raise CustomException("Please use a valid speech processing library. {lib} is not valid!".format(lib=lib))
-        except Exception as e:
-            raise CustomException("Audio generation failed", details={"error": str(e)})
+                    replyObj = gTTS(text=final_text, lang=gttsLang, slow=True, pre_processor_funcs=[abbreviations, end_of_line])
+
+                    replyObj.save(audio_path)
+                elif lib.lower() == 'pyttsx3':
+                    engine = pyttsx3.init()
+                    voices = filter(lambda v: v.gender == 'VoiceGenderFemale', engine.getProperty('voices'))
+                    for voice in enumerate(voices):
+                        print(voice[0], "Voice ID: ", voice[1].id, voice[1].languages[0])
+                        engine.setProperty('voice', voice[1].id)
+                        engine.say(final_text)
+                        engine.runAndWait()
+                else:
+                    raise CustomException("Please use a valid speech processing library. {lib} is not valid!".format(lib=lib))
+            except Exception as e:
+                raise CustomException("Audio generation failed", details={"error": str(e)})
         
         return audio_path
 
