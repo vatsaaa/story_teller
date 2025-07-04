@@ -157,14 +157,22 @@ Examples:
     
     # Load content from JSON file
     python social_media_publisher.py --platforms instagram --content-file story_content.json
+    
+    # Publish to all platforms
+    python social_media_publisher.py --all --title "My Story" --text "Check out this amazing story!" --images image1.jpg
         """
     )
     
-    # Required arguments
-    parser.add_argument(
+    # Platform selection arguments (mutually exclusive)
+    platform_group = parser.add_mutually_exclusive_group(required=True)
+    platform_group.add_argument(
         '--platforms',
-        required=True,
         help='Comma-separated list of platforms (twitter,instagram,threads,facebook,youtube)'
+    )
+    platform_group.add_argument(
+        '--all',
+        action='store_true',
+        help='Publish to all available platforms (twitter,instagram,threads,facebook,youtube)'
     )
     
     # Content arguments
@@ -211,7 +219,11 @@ Examples:
         sys.exit(1)
     
     # Parse platforms
-    platforms = [p.strip().lower() for p in args.platforms.split(',')]
+    if args.all:
+        platforms = ['twitter', 'instagram', 'threads', 'facebook', 'youtube']
+        print("🌐 Publishing to all platforms")
+    else:
+        platforms = [p.strip().lower() for p in args.platforms.split(',')]
     
     # Validate platforms
     supported_platforms = ['twitter', 'instagram', 'threads', 'facebook', 'youtube']
@@ -221,7 +233,7 @@ Examples:
             print(f"💡 Supported platforms: {', '.join(supported_platforms)}")
             sys.exit(1)
     
-    # What will be published
+    # Show what will be published
     print("📝 Content to be published:")
     print(f"   Title: {content.get('text', {}).get('title', 'N/A')}")
     print(f"   English Text: {content.get('text', {}).get('english', 'N/A')[:100]}...")
@@ -229,7 +241,10 @@ Examples:
     print(f"   Images: {len(content.get('images', []))} files")
     print(f"   Videos: {len(content.get('videos', []))} files")
     print(f"   Audios: {len(content.get('audios', []))} files")
-    print(f"   Platforms: {', '.join(platforms)}")
+    if args.all:
+        print(f"   Platforms: ALL ({', '.join(platforms)})")
+    else:
+        print(f"   Platforms: {', '.join(platforms)}")
     
     if args.dry_run:
         print("\n🔍 DRY RUN MODE - No actual publishing will occur")
@@ -237,7 +252,8 @@ Examples:
     
     # Confirm before publishing
     if not args.verbose:
-        confirm = input("\n❓ Do you want to proceed with publishing? (y/N): ")
+        platform_text = "ALL platforms" if args.all else f"{len(platforms)} platform(s)"
+        confirm = input(f"\n❓ Do you want to proceed with publishing to {platform_text}? (y/N): ")
         if confirm.lower() != 'y':
             print("❌ Publishing cancelled")
             return
