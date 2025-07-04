@@ -9,7 +9,6 @@ $ git remote add origin https://github.com/vatsaaa/story_teller.git
 $ git push -u origin main
 ```
 
-
 Problem: Every push prompt me to input username and password.
 I would like to avoid it for every push, but how to configure to avoid it?
 
@@ -60,3 +59,12 @@ Type of links that this should parse and get the story from: https://hindikahani
 How to run: streamlit run app.py
 
 Run unit tests: python3 -m unittest discover -s tests
+
+python -m unittest tests.test_publishers.TestPublishers.test_twitter_publisher
+
+python -m unittest tests.test_publishers.TestPublishers.test_facebook_publisher
+
+python -m unittest tests.test_publishers.TestPublishers.test_instagram_publisher
+
+python -m unittest tests.test_publishers.TestPublishers.test_youtube_publisher
+

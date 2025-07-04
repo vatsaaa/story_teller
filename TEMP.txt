@@ -1,0 +1,39 @@
+In Story::get_sceneries( ), self.sceneries is a Python dictionary of following type:
+{
+  "GoldenCaveInSnowyForest": {
+    "description": "In a frost-covered forest, a golden cave glows beneath snow-dusted pines. Two white elephants with six luminous tusks roam near its entrance, their ruby-red limbs glinting under the pale winter sun. The air is crisp, and mountain birds glide through the still, icy sky.",
+    "adjectives": ["majestic", "radiant", "serene", "pure", "mystical", "wintry"]
+  },
+
+  "LakesidePlayWithSalTree": {
+    "description": "Under a bright sky, white elephants splash joyfully in a tranquil lake. A tall Sal tree draped in fragrant blossoms leans over the shore, shedding petals and twigs. Birds chirp, monkeys leap between branches, and warm breezes ripple across the glistening water.",
+    "adjectives": ["playful", "vibrant", "fragrant", "joyful", "sunny", "peaceful"]
+  },
+
+  "QueenDepartureThroughWoods": {
+    "description": "At dusk, a solitary elephant queen walks away into a dense forest. Leaves crunch beneath her as golden light filters through tall trees. A chill sets in the air, and the mood is hushed, with only the wind whispering among the branches.",
+    "adjectives": ["lonely", "sorrowful", "quiet", "reflective", "wistful", "autumnal"]
+  },
+
+  "JungleTrapWithHiddenPit": {
+    "description": "In a humid forest clearing, a camouflaged pit lies beneath a bed of dry leaves and branches. A cloaked figure in orange robes hides behind thick foliage, bow drawn. Dim sunlight pierces the canopy, and the jungle buzzes with silent tension.",
+    "adjectives": ["stealthy", "tense", "suspenseful", "humid", "shadowy", "ominous"]
+  },
+
+  "ElephantOffersTusksByRiver": {
+    "description": "Beside a foggy river, a wounded white elephant bows gracefully. He uses his trunk to break off his tusks and offers them in silence. Mist hangs low, trees stand still, and the sky looms gray in a final act of dignity and sorrow.",
+    "adjectives": ["noble", "tragic", "graceful", "emotional", "selfless", "solemn"]
+  },
+
+  "GriefStrickenPalaceMoment": {
+    "description": "In a dim palace chamber, a queen stands motionless before two radiant tusks. Her face pales, and flower petals tremble in nearby vases as wind swirls through open arches. The light fades, and the room sinks into breathless stillness.",
+    "adjectives": ["heartbreaking", "grief-stricken", "silent", "emotional", "final", "gloomy"]
+  }
+}
+
+In Image.py, as an example scenery_title should be GoldenCaveInSnowyForest for the first image that gets created for the description from the above dictionary. Hence, the image will be saved as ./output/images/GoldenCaveInSnowyForest.png 
+
+Second scenery_title should be LakesidePlayWithSalTree, and so on. This image will be saved as ./output/images/LakesidePlayWithSalTree.png
+
+Do not change the LLM prompts at all.
+

@@ -4,12 +4,15 @@ from os import getenv
 import streamlit as st
 
 # Project imports
+from exceptions import ConfigurationException, ImageGenerationException, TranslationException
+from publishers.IPublisher import PublisherType
+from publishers.PublisherFactory import PublisherFactory
 from story.StoryFactory import StoryFactory
 from utils.conclusion import conclusion
 from utils.introduction import introduction
-from publishers.IPublisher import PublisherType
-from publishers.PublisherFactory import PublisherFactory
-from utils.Utils import usage
+from utils.conclusion import conclusion
+from utils.introduction import introduction
+from utils.Utils import MULTISPACE, usage
 
 def process_args(args: list):
     retvals = {
@@ -51,22 +54,51 @@ def process_args(args: list):
     return retvals
 
 def get_publishers(progargs: dict):
-    publisters_type = list()
-    publisters_type.append(progargs.get('fb'))
-    publisters_type.append(progargs.get('ig'))
-    publisters_type.append(progargs.get('tw'))
-    publisters_type.append(progargs.get('yt'))
+    from publishers.IPublisher import PublisherType
+    from exceptions import PublishingException, ConfigurationException
+    from os import getenv
     
     publishers = list()
-    for pt in publisters_type:
-        try:
-            p = PublisherFactory.create_publisher(pt)
-        except ValueError as err:
-            print(err)
-            continue
-        
-        publishers.append(p)
+    
+    # Map boolean flags to PublisherType enum values and their required credentials
+    publisher_configs = {
+        'fb': {
+            'type': PublisherType.FACEBOOK,
+            'params': lambda: {'page_id': getenv('FBIG_PAGE_ID')},
+            'name': 'Facebook'
+        },
+        'ig': {
+            'type': PublisherType.INSTAGRAM,
+            'params': lambda: {'credentials': {'access_token': getenv('IG_ACCESS_TOKEN')}},
+            'name': 'Instagram'
+        },
+        'tw': {
+            'type': PublisherType.TWITTER,
+            'params': lambda: {'credentials': {'access_token': getenv('TWITTER_ACCESS_TOKEN')}},
+            'name': 'Twitter'
+        },
+        'yt': {
+            'type': PublisherType.YOUTUBE,
+            'params': lambda: {'credentials': {'access_token': getenv('YOUTUBE_ACCESS_TOKEN')}},
+            'name': 'YouTube'
+        }
+    }
+    
+    for key, config in publisher_configs.items():
+        # Only create publisher if the corresponding flag is True
+        if progargs.get(key, False):
+            try:
+                params = config['params']()
+                p = PublisherFactory.create_publisher(config['type'], **params)
+                publishers.append(p)
+                print(f"✓ {config['name']} publisher configured successfully")
+            except (ValueError, PublishingException, ConfigurationException) as err:
+                print(f"Warning: Failed to create {config['name']} publisher: {err}")
+                continue
 
+    if not publishers:
+        print("Note: No publishers were configured. Story will be processed but not published.")
+    
     return publishers
 
 def main(progargs: dict):
@@ -82,13 +114,19 @@ def main(progargs: dict):
 
     # The visualization text we get in step above 
     # is used to get images for the story
-    story.get_images()
+    try:
+        story.get_images()
+    except ConfigurationException as e:
+        print(f"Warning: Image generation not configured: {str(e)}. Continuing without images...")
+    except ImageGenerationException as e:
+        print(f"Warning: Error generating images: {str(e)}. Continuing...")
+    except Exception as e:
+        print(f"Warning: Unexpected error during image generation: {str(e)}. Continuing...")
 
     # Get story audio
     story.get_audio('gTTS')
 
-    # The images we get in step above are used to
-    # generate a video for the story
+    # The images we get in step above are used to generate a video for the story
     story.get_video()
 
     # Publish the story now
@@ -97,18 +135,27 @@ def main(progargs: dict):
 
     return story.title.get("Hindi"), story.text.get("Hindi"), story.title.get("English"), story.text.get("English")
 
+URL_PATTERN = r"^http://|^https://"
 if __name__ == "__main__":
     mainargs = None
 
     if len(argv) < 2:
         st.set_page_config(layout="wide", page_title="Story Teller", page_icon="📖")
         st.title("Story Teller")
-        st.subheader("Stories for social media")
+        st.subheader("Kids stories for social media")
 
         with st.form(key='request_form'):
             url = st.text_input(label='URL', help='Enter the URL of the story you want to generate', autocomplete='on')
+            if url and not re.match(URL_PATTERN, url):
+                st.error("Please give a valid URL to fetch the story from!")
 
+            # Publisher selection with Mock exclusivity
+            st.subheader("Select Publishers")
+            
             c_fb, c_ig, c_tw, c_yt, c_mk = st.columns([1, 1, 1, 1, 1])
+
+            with c_mk:
+                cb_mk = st.checkbox(label='Mock', value=st.session_state.get('mock_mode', False))
 
             with c_fb:
                 cb_fb = st.checkbox(label='Facebook')
@@ -121,14 +168,11 @@ if __name__ == "__main__":
             
             with c_yt:
                 cb_yt = st.checkbox(label='YouTube')
-            
-            with c_mk:
-                cb_mk = st.checkbox(label='Mock')
 
             if 'mainargs' not in st.session_state:
                 st.session_state['mainargs'] = None
 
-            submit_button = st.form_submit_button(label='Submit')
+            submit_button = st.form_submit_button(label='Get Hindi Story', help='Click to fetch the story from the given URL')
             if submit_button:
                 mainargs = {'url': url
                             , 'fb': cb_fb
@@ -143,32 +187,47 @@ if __name__ == "__main__":
                 # Now that we have program arguments, create Story object
                 story = StoryFactory.create_story(progargs=mainargs)
 
-                # Get story from user given url
-                pattern = r"^http://|^https://"
-                try:
-                     if url and re.match(pattern, url):
-                         story.get_text()
-                except Exception as e:
-                    st.error("Please give a valid URL to fetch the story from!")
-
                 # Set story object in session state
                 st.session_state['story'] = story
-                    
-                # Publish the story
-                # publishers = get_publishers(mainargs)
-                # story.publish(publishers=publishers)
+
+                # Get story tedxt from the given URL
+                story.get_text()
+
+        # Show the story content outside the form if story is loaded
+        if 'story' in st.session_state and st.session_state['story'] is not None:
+            st.divider()
+            
+            story = st.session_state['story']
+            
+            # Safe handling of potentially None values
+            hindi_text = story.texts.get("Hindi")
+            if hindi_text and hindi_text.title and hindi_text.content:
+                story_content = hindi_text.title.strip() + "\n" + hindi_text.content.strip()
+            else:
+                story_content = "Story not loaded yet. Please provide a valid URL."
+            
+            # Create a separate form for translation
+            with st.form(key='translation_form'):
+                # Show the story
+                st.text_area(label="भूमिका", height=120, value=re.sub(MULTISPACE, ' ', introduction.get("Hindi")))                
+                st.text_area(label="कहानी", height=320, value=re.sub(MULTISPACE, ' ', story_content))
+                st.text_area(label="अन्त:भाग", height=80, value=re.sub(MULTISPACE, ' ', conclusion.get("Hindi")))
+
+                submit_story_h = st.form_submit_button(label='Translate Story to English')
+                if submit_story_h:
+                    try:
+                        story.translate()
+                        st.session_state['story'] = story
+                        st.success("Story translated to English successfully!")
+                    except TranslationException as e:
+                        st.error("🌐 ** Failed to translate story to English**")
+                        st.warning(f"Error details: {str(e)}")
+                        st.info("Please check that the Hindi story content is loaded properly and try again.")
+                    except Exception as e:
+                        st.error(f"❌ **Unexpected Error**: {str(e)}")
+                        st.info("Please try again.")
     elif len(argv) == 2 and (argv[1] == '-h' or argv[1] == '--help'):
         usage(2)
     else:
         mainargs = process_args(argv[1:])
         h_title, h_text, e_title, e_text = main(mainargs)
-
-        print("भूमिका: ", introduction.get("Hindi"), "\n\n")
-        print("शीर्षक: ", h_title, "\n\n")
-        print("कहानी: ", h_text, "\n\n")
-        print("उपसंहार: ", conclusion.get("Hindi"), "\n\n")
-
-        print("Introduction: ", introduction.get("English"), "\n\n")
-        print("Title: ", e_title, "\n\n")
-        print("Story: ", e_text, "\n\n")
-        print("Conclusion: ", conclusion.get("English"), "\n\n")

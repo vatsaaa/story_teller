@@ -1,4 +1,4 @@
-import itertools, json, re, requests
+import itertools, json, re, requests, os
 from openai import OpenAI
 from tenacity import (
     retry,
@@ -7,7 +7,7 @@ from tenacity import (
 )  # for exponential backoff
 import tiktoken
 
-from exceptions.CustomException import CustomException
+from exceptions import ConfigurationException, CustomException
 
 '''
 Note: This file contains utility functions that are used by other files in the project
@@ -35,14 +35,62 @@ def chunked_tokens(text, encoding_name, chunk_length):
     chunks_iterator = batched(tokens, chunk_length)
     yield from chunks_iterator
 
-def make_api_request(url, data, headers):
+def make_api_request(url, data, headers=None, max_retries=3, current_retry=0):
     try:
+        # Set 'key' as api_key in the data
+        data['key'] = None  # Placeholder, will be updated after reading the API key
+
+        # Read the API key file path from the environment variable
+        api_key_file = os.getenv("STABLEDIFFUSION_API_KEY_FILE")
+        if not api_key_file:
+            raise ConfigurationException(
+                "API key file path not set", 
+                config_key="STABLEDIFFUSION_API_KEY_FILE"
+            )
+
+        # Determine the key to read based on the current retry number
+        api_key_label = f"STABLEDIFFUSION_API_KEY_{current_retry + 1}"
+
+        # Read the API key from the specified file
+        try:
+            with open(api_key_file, 'r') as file:
+                keys = dict(line.strip().split('=', 1) for line in file if '=' in line)
+                api_key = keys.get(api_key_label)
+                if not api_key:
+                    raise ConfigurationException(
+                        f"API key '{api_key_label}' not found in the configuration file", 
+                        config_key=api_key_label,
+                        details={"file_path": api_key_file}
+                    )
+                data['key'] = api_key  # Update the data with the API key
+        except FileNotFoundError:
+            raise ConfigurationException(
+                f"API key file not found", 
+                config_key="STABLEDIFFUSION_API_KEY_FILE",
+                details={"file_path": api_key_file}
+            )
+        except Exception as e:
+            raise ConfigurationException(
+                "Failed to read API key file", 
+                config_key="STABLEDIFFUSION_API_KEY_FILE",
+                details={"file_path": api_key_file, "error": str(e)}
+            )
+
         response = requests.post(url=url, data=json.dumps(data), headers=headers)
-        print(f"Called {url}")
-        print(f"Response Status Code: {response.status_code}")
-        print(f"Response Content: {response.text}")
         response.raise_for_status()
+
+        # Check for specific error conditions
+        if response.status_code == 200:
+            response_json = response.json()
+            if response_json.get("status") == "error" and re.search("limit exceeded", response_json.get("message", "")):
+                if current_retry < max_retries:
+                    print(f"Retrying with a new API key. Attempt {current_retry + 1} of {max_retries}.")
+                    return make_api_request(url, data, headers, max_retries, current_retry + 1)
+                else:
+                    raise CustomException("Max retries reached for API request.")
+
         return response
+
     except requests.exceptions.RequestException as e:
         error_details = {
             "url": url,
@@ -66,6 +114,28 @@ def urlify(s: str) -> str:
     s = re.sub(r"\s+", '', s)
 
     return s
+
+def ascii_safe_filename(s: str) -> str:
+    """Create an ASCII-safe filename from any string, including non-ASCII characters."""
+    import unicodedata
+    
+    # First try to normalize and convert to ASCII
+    try:
+        # Normalize unicode characters
+        s = unicodedata.normalize('NFD', s)
+        # Remove non-ASCII characters
+        s = s.encode('ascii', 'ignore').decode('ascii')
+        # Remove punctuation and special characters, keep only alphanumeric
+        s = re.sub(r'[^a-zA-Z0-9\s]', '', s)
+        # Replace spaces with underscores and remove extra whitespace
+        s = re.sub(r'\s+', '_', s.strip())
+        # If the result is empty or too short, use a fallback
+        if len(s) < 2:
+            return "story_file"
+        return s
+    except Exception:
+        # Fallback to a generic name
+        return "story_file"
 
 def usage(exit_code: int) -> None:
     print("Usage: app.py [OPTIONS]")

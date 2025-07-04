@@ -1,43 +1,49 @@
-from bs4 import BeautifulSoup
-import datetime, dotenv, itertools, requests
-from gtts import gTTS
-from gtts.tokenizer.pre_processors import abbreviations, end_of_line
-import json
+import ast, datetime, dotenv, itertools, requests
 
 from langchain.chains import LLMChain
-from langchain_community.chat_models import ChatOpenAI
 from langchain.prompts import PromptTemplate
-from langchain.text_splitter import RecursiveCharacterTextSplitter
 
 from moviepy import editor
 from mutagen.mp3 import MP3
 
 from os import getenv, path
 
-import pathlib, pyttsx3, re
 from PIL import Image
 
 from string import punctuation
 from sys import stderr
 from typing import List
-import ast
 
 # Project imports
-from exceptions.CustomException import CustomException
-from story.IStory import IStory
+from exceptions import (
+    ConfigurationException, 
+    ImageGenerationException, 
+    TranslationException, 
+    StoryProcessingException,
+    VideoGenerationException
+)
 from publishers.IPublisher import IPublisher
+
+from story.IStory import IStory
+from story.Audio import Audio
+from story.Image import Image
+from story.Text import Text
+from story.Video import Video
+
 from utils.conclusion import conclusion
 from utils.introduction import introduction
-from utils.Utils import make_api_request, num_tokens_from_string, urlify, MULTISPACE
+from utils.Utils import make_api_request, urlify
 
 dotenv.load_dotenv()
 
 class Story(IStory):
     id_obj = itertools.count(1)
 
-    def __init__(self, progargs: dict=None) -> None:
+    def __init__(self, progargs: dict = None) -> None:
+        from langchain_community.chat_models import ChatOpenAI
+
         super().__init__()
-        
+
         self.id = next(Story.id_obj)
         self.date = datetime.datetime.today().strftime('%Y-%m-%d')
 
@@ -45,235 +51,172 @@ class Story(IStory):
         self.ig = progargs.get('ig', None)
         self.tw = progargs.get('tw', None)
         self.yt = progargs.get('yt', None)
-        self.name = None
-        
+
         self.url = progargs.get('url', None)
         self.mock = False
-        self.text = {
-            "Hindi": None,
-            "English": None
-        }
-        self.title = {
-            "Hindi": None,
-            "English": None
-        }
-        self.sceneries = dict(dict())
-        self.llm = ChatOpenAI(temperature=0.4, api_key=getenv('OPENROUTER_API_KEY'), base_url="https://openrouter.ai/api/v1")
 
-    def get_text(self):
-        COLONPATTERN = re.compile(r':\s$', re.MULTILINE)
-
-        response = requests.get(self.url)
-        response.raise_for_status()
+        self.texts = {
+            "Hindi": Text(language="Hindi"),
+            "English": Text(language="English")
+        }
         
-        soup = BeautifulSoup(response.content, 'html.parser')
-        headings = soup.find_all('h1')
-        paragraphs = soup.find_all('p')
+        self.audio = None
+        self.video = None
+        self.sceneries = {}  # Initialize sceneries dictionary
+        self.llm = ChatOpenAI(
+            temperature=0.4, 
+            api_key=getenv('OPENROUTER_API_KEY'), 
+            base_url="https://openrouter.ai/api/v1",
+            model=getenv('MODEL', "google/gemma-3-27b-it:free"),
+            default_headers={
+                "HTTP-Referer": "https://localhost:8501",
+                "X-Title": "Story Teller App"
+            }
+        )
+        self.images: List[Image] = []  # Initialize as an empty list to store Image objects
 
-        self.title["Hindi"] = [h.get_text() for h in headings][0].split(":")[0]
-        self.text["Hindi"] = [re.sub(COLONPATTERN, '-', p.get_text().replace("दु:", "दु").replace("छ:", "छह")) for p in paragraphs][0].split(":")[0]
-        # self.text["Hindi"] = re.sub(r'\n+', '\n', self.text.get("Hindi"))
+    def get_text(self, language: str = "Hindi") -> None:
+        self.texts[language].get(self.url)
+        self.name = self.texts[language].title.replace(" ", '').translate(str.maketrans('', '', punctuation))
 
-        # Set the story name using the title
-        self.name = self.title.get("Hindi").replace(" ", '').translate(str.maketrans('', '', punctuation))
-
-    def translate(self) -> None:
+    def translate(self):
         print("Translating story to English...")
-        if self.text.get("Hindi"):
-            text_to_translate = self.text.get("Hindi")
-
-            # Set up the translation prompt, grammer (e.g. articles) omitted for brevity
-            translation_template = '''
-            You are a highly proficient translator for {from_lang} and {to_lang} languages.
-            Between tags <TEXT> and </TEXT>, is text of a popular story for kids in {from_lang} language. Please translate it to {to_lang} language.
-            
-            Only return the translation in {to_lang} language, nothing else. Do not embed the translation in <TEXT> and </TEXT> tags.
-
-            Returned text must be highly engaging and suitable for a youtube channel higly popular amongst kids of 5 years to 14 years.
-
-            <TEXT>{text}</TEXT>
-            '''
-
-            ## Create chunks of text to translate
-            print("Splitting text into chunks...")
-            text_splitter = RecursiveCharacterTextSplitter(chunk_size=3300
-                                                           , chunk_overlap=10
-                                                           , length_function=len
-                                                           , separators = ['\n', '।\s$'])
-            chunks = text_splitter.split_text(text=text_to_translate)
-
-            ## Translate each chunk
-            text_prompt = PromptTemplate(template=translation_template, input_variables=['from_lang', 'to_lang', 'text'])
-            chain2 = LLMChain(llm=self.llm,prompt=text_prompt)
-            try:
-                translated_text: list[str] = []
-                for chunk_num, chunk in enumerate(chunks):
-                    input = {'from_lang': "Hindi", 'to_lang': "English", 'text': chunk}
-                    translated_text.append(chain2.run(input))
-
-                self.text["English"] = " ".join(translated_text)
-            except Exception as e:
-                raise CustomException("Translation failed", details={"error": str(e)})
+        if self.texts["Hindi"].content and self.texts["Hindi"].title:
+            self.texts["English"].content = self.texts["Hindi"].translate(to_language="English", llm=self.llm)
+            # There is no need to copy or translate the title 
         else:
-            raise CustomException("Hindi story text is missing. Please fetch the story first.")
+            raise TranslationException(
+                "Hindi story text is missing. Please fetch the story first.",
+                source_lang="Hindi",
+                target_lang="English"
+            )
 
     def get_sceneries(self):
         print("Getting description for sceneries...")
-        template_prompt = '''Act as highly creative, accomplished and expert "visual illustrator" that extracts sceneries from text of ancient Indian stories, given within <STORY> and </STORY> tags.
-        Aesthetic scenes are elaborately explained and usually set in natural surroundings. Humans, trees, flowers, ornaments, water bodies, birds, mountains, valleys, Sun, Moon, stars, animals and other living beings are focused upon.
-        Details about season, climate, weather, time of the day, colours are important.
-        Scenes extracted from given story should not have names of characters, places or any other proper nouns. In a scene, no living being should be alone.
-        Represent the extracted scenes as a Python dictionary. Keys in this dictionary have meaningful names extracted from the scenery description like "Vikramaditya's Court", "Hut with beautiful lawns". 
-        The value for the key in that dictionary is a nested python dictionary with first element as detailed description of the scenery.
-        The second element in the nested dictionary is a list of adjectives and sentiments that can be used to explain the scenery.
-        Nothing else is required in the output Python dictionary.
 
+        template_prompt = '''Act as a highly creative visual illustrator. Based on the story within <STORY> and </STORY> tags, extract scenery descriptions as a Python dictionary.
+        Each key: meaningful scene name written in CamelCase, starting with a capital letter but no spaces or special characters
+        Each value: nested dictionary containing:
+        A short, vivid description of the scene with living entities e.g., animals, birds, insects, humans and natural elements, season, time, weather, colors and more.
+        and
+        A list of adjectives and sentiments from the scene.
+        Descriptions must be rich but concise.
         <STORY>{story}</STORY>
         '''
 
         sceneries_prompt = PromptTemplate(template=template_prompt, input_variables=['story'])
 
         chain2 = LLMChain(llm=self.llm, prompt=sceneries_prompt)
-        input = {'story': self.text.get("English")}
+        input = {'story': self.texts["English"].content}
 
         try:
             sceneries_output = chain2.run(input)
-            # Parse the output to ensure it is a dictionary
+            
+            # Clean the output if it's wrapped in markdown code blocks
+            if isinstance(sceneries_output, str):
+                # Remove markdown code blocks if present
+                sceneries_output = sceneries_output.strip()
+                if sceneries_output.startswith('```python'):
+                    sceneries_output = sceneries_output[9:]
+                if sceneries_output.startswith('```'):
+                    sceneries_output = sceneries_output[3:]
+                if sceneries_output.endswith('```'):
+                    sceneries_output = sceneries_output[:-3]
+                sceneries_output = sceneries_output.strip()
+            
             self.sceneries = ast.literal_eval(sceneries_output) if isinstance(sceneries_output, str) else sceneries_output
+            
+            # Validate that sceneries were extracted
+            if not self.sceneries or not isinstance(self.sceneries, dict):
+                raise StoryProcessingException(
+                    "No valid sceneries extracted from the story",
+                    processing_step="scenery_validation",
+                    details={"sceneries_output": str(sceneries_output)[:200]}
+                )
+            
+            print(f"Sceneries extracted: {self.sceneries}")
+
+            # Create Image objects and append to images array
+            for key, value in self.sceneries.items():
+                print(f"Creating image for scenery: {key}")
+                print(f"Description: {value.get('description', '')}")
+                print(f"Sentiments: {value.get('adjectives', [])}")
+
+                image = Image(title=key, path="./output/images/", description=value.get("description", ""), sentiments=value.get("adjectives", []))
+                image.width = 512
+                image.height = 512
+                self.images.append(image)
         except Exception as e:
-            raise CustomException("Failed to get sceneries", details={"error": str(e)})
-    
-    def get_images(self, width: int = 512, height: int = 512, count: int = 1) -> None:        
-        t2i_api_key = getenv('STABLEDIFFUSION_API_KEY')
-        if not t2i_api_key:
-            raise CustomException("STABLEDIFFUSION_API_KEY is not set. Please configure it to use Stable Diffusion.")
+            raise StoryProcessingException(
+                "Failed to get sceneries", 
+                processing_step="scenery_extraction",
+                details={"error": str(e), "story_length": len(self.texts["English"].content) if self.texts["English"].content else 0}
+            )
 
-        if not getenv('TEXT_TO_IMAGE_URL'):
-            raise CustomException("TEXT_TO_IMAGE_URL is not set. Please configure it to use Stable Diffusion.")
-
-        for key in self.sceneries:
-            scenery_title = key
-            scenery_prompt = '''Create ultra-detailed and hyper-realistic scene with cinematic lightning, 8k resolution and sharp focus, described in these words: {description}. 
-                                Scene sentiments are explained by words such as {sentiments}.
-                            '''.format(description=self.sceneries.get(key).get("description"), 
-                                        sentiments=self.sceneries.get(key).get("sentiments"))
-
-            img_data = None
-            image_url = None
-            output_path = None
-
-            data = {
-                'prompt': scenery_prompt,
-                "negative_prompt": "(worst quality:2), (low quality:2), (normal quality:2), (jpeg artifacts), (blurry), (duplicate), (morbid), (mutilated), (out of frame), (extra limbs), (bad anatomy), (disfigured), (deformed), (cross-eye), (glitch), (oversaturated), (overexposed), (underexposed), (bad proportions), (bad hands), (bad feet), (cloned face), (long neck), (missing arms), (missing legs), (extra fingers), (fused fingers), (poorly drawn hands), (poorly drawn face), (mutation), (deformed eyes), watermark, text, signature, grainy, tiling, ugly, blurry eyes, noisy image, bad lighting, unnatural skin, asymmetry",
-                'width': width,
-                'height': height,
-                'samples': count,
-                "safety_checker": 0,
-                "base64": 0,
-                'key': t2i_api_key
-            }
-
-            headers = {
-                'Content-type': 'application/json',
-                'Accept': 'application/json'
-            }
-
-            try:
-                url = "https://modelslab.com/api/v6/realtime/text2img"
-                response = make_api_request(url, data, headers)
-
-                response_json = response.json()
-                if not response_json or 'output' not in response_json or not response_json['output']:
-                    raise CustomException("Image generation failed", details={"error": "No images returned by the API or invalid response format."})
-
-                image_url = response_json['output'][0]  # Safely access the first image URL
-
-                img_data = requests.get(image_url).content if image_url else None
-                if img_data:
-                    scenery_title = urlify(scenery_title)
-                    img_name = './images/' + scenery_title + '.png'
-                    output_path = path.join(img_name)
-                    with open(output_path, 'wb') as handler:
-                        handler.write(img_data)
-                else:
-                    raise CustomException("Image data is empty!", details={"image_url": image_url})
-            except Exception as e:
-                raise CustomException("Error during image generation", details={"error": str(e)})
+    def get_images(self, count: int = 1) -> None:
+        try:
+            for image in self.images:
+                image.create()
+        except (ConfigurationException, ImageGenerationException) as e:
+            if "TEXT_TO_IMAGE_URL is not set" in str(e):
+                raise ConfigurationException(
+                    "Image generation is not configured. Please set TEXT_TO_IMAGE_URL in your .env file to use Stable Diffusion for image generation.",
+                    config_key="TEXT_TO_IMAGE_URL",
+                    details={
+                        "solution": "Add TEXT_TO_IMAGE_URL=your_stable_diffusion_url to .env file"
+                    }
+                )
+            else:
+                # Re-raise other specific exceptions as-is
+                raise e
+        except Exception as e:
+            raise ImageGenerationException(
+                "Failed to generate images", 
+                details={"error": str(e), "image_count": len(self.images)}
+            )
             
     def get_audio(self, lib: str) -> str:
-        print("Begining to process audio...")
-        final_text = introduction.get("Hindi") + "\n\n" + self.text.get("Hindi") + "\n\n" + conclusion.get("Hindi") + "\n\n"
-        audio_path = './audios/' + self.name + ".mp3"
-        audio_path = path.join('./audios/', self.name + ".mp3")
-
-        # Check if the audio file exists before proceeding
-        if not path.exists(audio_path):
-            try:
-                if lib.lower() == 'gtts':
-                    gttsLang = 'hi' # Hindi language
-
-                    replyObj = gTTS(text=final_text, lang=gttsLang, slow=True, pre_processor_funcs=[abbreviations, end_of_line])
-
-                    replyObj.save(audio_path)
-                elif lib.lower() == 'pyttsx3':
-                    engine = pyttsx3.init()
-                    voices = filter(lambda v: v.gender == 'VoiceGenderFemale', engine.getProperty('voices'))
-                    for voice in enumerate(voices):
-                        print(voice[0], "Voice ID: ", voice[1].id, voice[1].languages[0])
-                        engine.setProperty('voice', voice[1].id)
-                        engine.say(final_text)
-                        engine.runAndWait()
-                else:
-                    raise CustomException("Please use a valid speech processing library. {lib} is not valid!".format(lib=lib))
-            except Exception as e:
-                raise CustomException("Audio generation failed", details={"error": str(e)})
-        
-        return audio_path
+        print("Beginning to process audio...")
+        final_text = introduction.get("Hindi") + "\n\n" + self.texts["Hindi"].content + "\n\n" + conclusion.get("Hindi") + "\n\n"
+        self.audio.generate(text=final_text, name=self.name, lib=lib)
+        return self.audio.path
 
     def get_video(self) -> str:
-        print("Begining to process video...")
-        video_name = self.name + ".mp4"
-        audio_name = self.name + ".mp3"
-
-        video_path = path.join('./videos', video_name)
-        audio_path = path.join('./audios', audio_name)
-
-        try:
-            # Read the story audio mp3 file and set its length
-            story_audio = MP3(audio_path)
-            audio_length = round(story_audio.info.length) + 1
-            
-            # Glob the images and stitch them to get the gif
-            path_images = pathlib.Path('./images/')
-            images = list(path_images.absolute().glob('*.png'))
-            image_list = list()
-            
-            for image_name in images:
-                image = Image.open(image_name).resize((800, 800), Image.Resampling.LANCZOS)
-                image_list.append(image)
-            
-            print("Number of images: ", len(image_list), "\nAudio length: ", audio_length)
-            duration = int(audio_length / len(image_list)) * 1000
-
-            # Creating the gif
-            image_list[0].save(path.join('./videos/',"temp.gif"),save_all=True,append_images=image_list[1:],duration=duration)
-            
-            # Getting the vieo from the gif
-            video = editor.VideoFileClip(path.join('./videos/', "temp.gif"))
-
-            # Add audio to the video
-            audio = editor.AudioFileClip(audio_path)
-            video = video.set_audio(audio).set_fps(60)
-            video.write_videofile(video_path)
-        except Exception as e:
-            raise CustomException("Video generation failed", details={"error": str(e)})
-
-        return video_path  
+        print("Beginning to process video...")
+        # Use the CamelCase scenery titles directly for image paths, but only if files exist
+        image_paths = []
+        for key in self.sceneries.keys():
+            image_path = f"./output/images/{key}.png"
+            if path.exists(image_path):
+                image_paths.append(image_path)
+        
+        if not image_paths:
+            raise VideoGenerationException(
+                "No images found for video generation",
+                details={"expected_images": list(self.sceneries.keys())}
+            )
+        
+        self.video.generate(name=self.name, audio_path=self.audio.path, image_paths=image_paths)
+        return self.video.path
     
     def publish(self, publishers: List[IPublisher]) -> None:
+        # Prepare content for publishing
+        content = {
+            "text": {
+                "hindi": self.texts.get("Hindi", Text("Hindi")).content if hasattr(self, 'texts') else "",
+                "english": self.texts.get("English", Text("English")).content if hasattr(self, 'texts') else "",
+                "title": self.texts.get("Hindi", Text("Hindi")).title if hasattr(self, 'texts') else "Story"
+            },
+            "audios": [self.audio.path] if hasattr(self, 'audio') and self.audio.path else [],
+            "videos": [self.video.path] if hasattr(self, 'video') and self.video.path else [],
+            "images": [img.path for img in getattr(self, 'images', []) if hasattr(img, 'path') and img.path] if hasattr(self, 'images') else []
+        }
+        
         for publisher in publishers:
-            publisher.login()
-
-            publisher.publish()
-            
-            publisher.logout()
+            try:
+                publisher.login()
+                publisher.publish(content)
+                publisher.logout()
+            except Exception as e:
+                print(f"Publishing failed for {type(publisher).__name__}: {e}")
+                # Continue with other publishers even if one fails
