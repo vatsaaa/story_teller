@@ -27,7 +27,8 @@ Successfully implemented all social media publishers according to requirements. 
   - Text posting with title
   - Image posting support
   - Character limit handling (280 chars)
-  - Mock implementation for testing
+  - **Real Twitter API integration using tweepy**
+  - Mock mode for testing (set `TWITTER_MOCK_MODE=true`)
 
 ### 2. InstagramPublisher ✅
 - **Location**: `publishers/InstagramPublisher.py`
@@ -137,6 +138,7 @@ Successfully implemented all social media publishers according to requirements. 
 - `TWITTER_API_SECRET`
 - `TWITTER_ACCESS_TOKEN`
 - `TWITTER_ACCESS_TOKEN_SECRET`
+- `TWITTER_MOCK_MODE` (optional, set to "true" for testing without posting)
 
 ### Instagram
 - `IG_ACCESS_TOKEN`

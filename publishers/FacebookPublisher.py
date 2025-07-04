@@ -1,5 +1,7 @@
 from dotenv import load_dotenv
 from os import getenv
+import requests
+import json
 
 # Project imports
 from publishers.IPublisher import IPublisher
@@ -11,6 +13,8 @@ class FacebookPublisher(IPublisher):
     def __init__(self, page_id: str) -> None:
         super().__init__()
         self.page_id = page_id
+        self.mock_mode = getenv('FACEBOOK_MOCK_MODE', 'false').lower() == 'true'
+        self.access_token = None
         
         # Check for required environment variables
         base_url = getenv('FBIG_BASE_URL')
@@ -34,6 +38,10 @@ class FacebookPublisher(IPublisher):
     
     def login(self) -> None:
         """Login to Facebook with credential validation."""
+        if self.mock_mode:
+            print("[MOCK MODE] Skipping Facebook authentication")
+            return
+            
         access_token = getenv('FBIG_ACCESS_TOKEN')
         if not access_token:
             raise ConfigurationException(
@@ -42,11 +50,23 @@ class FacebookPublisher(IPublisher):
                 details={"solution": "Create an API key from Facebook and set it in your .env file as FBIG_ACCESS_TOKEN"}
             )
         
-        self.headers = {
-            'Authorization': f'Bearer {access_token}',
-            'Content-Type': 'application/json'
-        }
         self.access_token = access_token
+        
+        # Test the credentials
+        try:
+            url = f"{self.base_url}{self.page_id}"
+            params = {'access_token': access_token}
+            response = requests.get(url, params=params)
+            
+            if response.status_code != 200:
+                raise Exception(f"API returned status code {response.status_code}: {response.text}")
+                
+        except Exception as e:
+            raise ConfigurationException(
+                f"Failed to authenticate with Facebook: {str(e)}",
+                config_key="FACEBOOK_CREDENTIALS",
+                details={"solution": "Check your Facebook API credentials and ensure they are valid"}
+            )
     
     def publish(self, content: dict) -> None:
         """Publish content to Facebook."""
@@ -87,24 +107,90 @@ class FacebookPublisher(IPublisher):
             raise
 
     def _post_text(self, message: str) -> None:
-        """Mock Facebook text posting function - in real implementation would use Facebook API."""
-        print(f"Posting to Facebook:")
-        print(f"Message: {message}")
+        """Post text to Facebook using the API or mock mode."""
+        if self.mock_mode:
+            print(f"[MOCK MODE] Posting to Facebook:")
+            print(f"[MOCK MODE] Message: {message}")
+            return
+            
+        try:
+            url = f"{self.base_url}{self.page_id}/feed"
+            params = {
+                'message': message,
+                'access_token': self.access_token
+            }
+            
+            response = requests.post(url, data=params)
+            response_data = response.json()
+            
+            if 'id' in response_data:
+                print(f"Facebook text post published successfully. Post ID: {response_data['id']}")
+            else:
+                raise Exception(f"Failed to publish text post: {response_data}")
+                
+        except Exception as e:
+            print(f"Failed to post text to Facebook: {str(e)}")
+            raise
 
     def _post_image(self, message: str, image: str) -> None:
-        """Mock Facebook image posting function - in real implementation would use Facebook API."""
-        print(f"Posting to Facebook with image:")
-        print(f"Message: {message}")
-        print(f"Image: {image}")
+        """Post image to Facebook using the API or mock mode."""
+        if self.mock_mode:
+            print(f"[MOCK MODE] Posting to Facebook with image:")
+            print(f"[MOCK MODE] Message: {message}")
+            print(f"[MOCK MODE] Image: {image}")
+            return
+            
+        try:
+            url = f"{self.base_url}{self.page_id}/photos"
+            params = {
+                'url': image,  # Note: This requires a publicly accessible URL
+                'caption': message,
+                'access_token': self.access_token
+            }
+            
+            response = requests.post(url, data=params)
+            response_data = response.json()
+            
+            if 'id' in response_data:
+                print(f"Facebook image post published successfully. Post ID: {response_data['id']}")
+            else:
+                raise Exception(f"Failed to publish image post: {response_data}")
+                
+        except Exception as e:
+            print(f"Failed to post image to Facebook: {str(e)}")
+            print("Note: Facebook API requires publicly accessible image URLs")
+            raise
 
     def _post_video(self, message: str, video: str) -> None:
-        """Mock Facebook video posting function - in real implementation would use Facebook API."""
-        print(f"Posting to Facebook with video:")
-        print(f"Message: {message}")
-        print(f"Video: {video}")
+        """Post video to Facebook using the API or mock mode."""
+        if self.mock_mode:
+            print(f"[MOCK MODE] Posting to Facebook with video:")
+            print(f"[MOCK MODE] Message: {message}")
+            print(f"[MOCK MODE] Video: {video}")
+            return
+            
+        try:
+            url = f"{self.base_url}{self.page_id}/videos"
+            params = {
+                'file_url': video,  # Note: This requires a publicly accessible URL
+                'description': message,
+                'access_token': self.access_token
+            }
+            
+            response = requests.post(url, data=params)
+            response_data = response.json()
+            
+            if 'id' in response_data:
+                print(f"Facebook video post published successfully. Post ID: {response_data['id']}")
+            else:
+                raise Exception(f"Failed to publish video post: {response_data}")
+                
+        except Exception as e:
+            print(f"Failed to post video to Facebook: {str(e)}")
+            print("Note: Facebook API requires publicly accessible video URLs")
+            raise
 
     def logout(self) -> None:
         """Logout from Facebook."""
-        self.headers = None
         self.access_token = None
         print("Logged out from Facebook Publisher.")

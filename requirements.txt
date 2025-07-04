@@ -14,5 +14,6 @@ openai
 opencv-python
 python-dotenv
 pyttsx3
+requests
 tiktoken
 tweepy

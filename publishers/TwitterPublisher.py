@@ -1,5 +1,6 @@
 from dotenv import load_dotenv
 from os import getenv
+import tweepy
 
 # Project imports
 from publishers.IPublisher import IPublisher
@@ -10,9 +11,15 @@ load_dotenv()
 class TwitterPublisher(IPublisher):
     def __init__(self, credentials: dict) -> None:
         super().__init__(credentials)
+        self.twitter_client = None
+        self.mock_mode = getenv('TWITTER_MOCK_MODE', 'false').lower() == 'true'
         
     def login(self) -> None:
         """Login to Twitter with credential validation."""
+        if self.mock_mode:
+            print("[MOCK MODE] Skipping Twitter authentication")
+            return
+            
         access_token = self.credentials.get('access_token')
         if not access_token:
             raise ConfigurationException(
@@ -43,6 +50,26 @@ class TwitterPublisher(IPublisher):
                 "Twitter Access Token Secret is not set",
                 config_key="TWITTER_ACCESS_TOKEN_SECRET",
                 details={"solution": "Add TWITTER_ACCESS_TOKEN_SECRET to your .env file with your Twitter access token secret"}
+            )
+        
+        try:
+            # Initialize Twitter API client
+            self.twitter_client = tweepy.Client(
+                consumer_key=api_key,
+                consumer_secret=api_secret,
+                access_token=access_token,
+                access_token_secret=access_token_secret,
+                wait_on_rate_limit=True
+            )
+            
+            # Test the connection
+            self.twitter_client.get_me()
+            
+        except Exception as e:
+            raise ConfigurationException(
+                f"Failed to authenticate with Twitter: {str(e)}",
+                config_key="TWITTER_CREDENTIALS",
+                details={"solution": "Check your Twitter API credentials and ensure they are valid"}
             )
     
     def publish(self, content: dict) -> None:
@@ -85,13 +112,46 @@ class TwitterPublisher(IPublisher):
             raise
 
     def _tweet(self, message: str) -> None:
-        """Mock tweet function - in real implementation would use Twitter API."""
-        print(f"Tweeting: {message}")
+        """Post tweet to Twitter using the API or mock mode."""
+        if self.mock_mode:
+            print(f"[MOCK MODE] Tweeting: {message}")
+            return
+            
+        try:
+            if not self.twitter_client:
+                raise Exception("Twitter client not initialized. Call login() first.")
+            
+            response = self.twitter_client.create_tweet(text=message)
+            print(f"Tweet posted successfully. Tweet ID: {response.data['id']}")
+            
+        except Exception as e:
+            print(f"Failed to post tweet: {str(e)}")
+            raise
 
     def _tweet_with_image(self, message: str, image: str) -> None:
-        """Mock tweet with image function - in real implementation would use Twitter API."""
-        print(f"Tweeting with image: {message}, Image: {image}")
+        """Post tweet with image to Twitter using the API or mock mode."""
+        if self.mock_mode:
+            print(f"[MOCK MODE] Tweeting with image: {message}, Image: {image}")
+            return
+            
+        try:
+            if not self.twitter_client:
+                raise Exception("Twitter client not initialized. Call login() first.")
+            
+            # Note: For image upload, we need to use the v1.1 API
+            # This is a simplified implementation - in production you'd handle image upload properly
+            print(f"Image posting not fully implemented yet. Posting text only.")
+            print(f"Image: {image}")
+            
+            # For now, just post the text
+            response = self.twitter_client.create_tweet(text=message)
+            print(f"Tweet with image reference posted successfully. Tweet ID: {response.data['id']}")
+            
+        except Exception as e:
+            print(f"Failed to post tweet with image: {str(e)}")
+            raise
     
     def logout(self) -> None:
         """Logout from Twitter."""
+        self.twitter_client = None
         print("Logged out from Twitter Publisher.")

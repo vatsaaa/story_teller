@@ -1,5 +1,7 @@
 from os import getenv
 from dotenv import load_dotenv
+import requests
+import json
 
 # Project imports
 from publishers.IPublisher import IPublisher
@@ -10,9 +12,16 @@ load_dotenv()
 class ThreadsPublisher(IPublisher):
     def __init__(self, credentials: dict) -> None:
         super().__init__(credentials)
+        self.mock_mode = getenv('THREADS_MOCK_MODE', 'false').lower() == 'true'
+        self.access_token = None
+        self.user_id = None
         
     def login(self) -> None:
         """Login to Threads with credential validation."""
+        if self.mock_mode:
+            print("[MOCK MODE] Skipping Threads authentication")
+            return
+            
         access_token = self.credentials.get('access_token')
         if not access_token:
             raise ConfigurationException(
@@ -29,11 +38,24 @@ class ThreadsPublisher(IPublisher):
                 details={"solution": "Add THREADS_USER_ID to your .env file with your Threads user ID"}
             )
         
-        self.headers = {
-            'Authorization': f'Bearer {access_token}',
-            'Content-Type': 'application/json'
-        }
+        self.access_token = access_token
         self.user_id = user_id
+        
+        # Test the credentials
+        try:
+            url = f"https://graph.threads.net/v1.0/{user_id}"
+            params = {'access_token': access_token}
+            response = requests.get(url, params=params)
+            
+            if response.status_code != 200:
+                raise Exception(f"API returned status code {response.status_code}: {response.text}")
+                
+        except Exception as e:
+            raise ConfigurationException(
+                f"Failed to authenticate with Threads: {str(e)}",
+                config_key="THREADS_CREDENTIALS",
+                details={"solution": "Check your Threads API credentials and ensure they are valid"}
+            )
 
     def publish(self, content: dict) -> None:
         """Publish content to Threads."""
@@ -75,15 +97,93 @@ class ThreadsPublisher(IPublisher):
             raise
 
     def _post_thread(self, message: str) -> None:
-        """Mock thread posting function - in real implementation would use Threads API."""
-        print(f"Posting to Threads: {message}")
+        """Post thread to Threads using the API or mock mode."""
+        if self.mock_mode:
+            print(f"[MOCK MODE] Posting to Threads: {message}")
+            return
+            
+        try:
+            # Step 1: Create thread post
+            create_url = f"https://graph.threads.net/v1.0/{self.user_id}/threads"
+            create_params = {
+                'media_type': 'TEXT',
+                'text': message,
+                'access_token': self.access_token
+            }
+            
+            create_response = requests.post(create_url, data=create_params)
+            create_data = create_response.json()
+            
+            if 'id' not in create_data:
+                raise Exception(f"Failed to create thread: {create_data}")
+            
+            thread_id = create_data['id']
+            
+            # Step 2: Publish the thread
+            publish_url = f"https://graph.threads.net/v1.0/{self.user_id}/threads_publish"
+            publish_params = {
+                'creation_id': thread_id,
+                'access_token': self.access_token
+            }
+            
+            publish_response = requests.post(publish_url, data=publish_params)
+            publish_data = publish_response.json()
+            
+            if 'id' in publish_data:
+                print(f"Thread posted successfully. Thread ID: {publish_data['id']}")
+            else:
+                raise Exception(f"Failed to publish thread: {publish_data}")
+                
+        except Exception as e:
+            print(f"Failed to post thread: {str(e)}")
+            raise
 
     def _post_thread_with_image(self, message: str, image: str) -> None:
-        """Mock thread with image posting function - in real implementation would use Threads API."""
-        print(f"Posting to Threads with image: {message}, Image: {image}")
+        """Post thread with image to Threads using the API or mock mode."""
+        if self.mock_mode:
+            print(f"[MOCK MODE] Posting to Threads with image: {message}, Image: {image}")
+            return
+            
+        try:
+            # Step 1: Create thread post with image
+            create_url = f"https://graph.threads.net/v1.0/{self.user_id}/threads"
+            create_params = {
+                'media_type': 'IMAGE',
+                'image_url': image,  # Note: This requires a publicly accessible URL
+                'text': message,
+                'access_token': self.access_token
+            }
+            
+            create_response = requests.post(create_url, data=create_params)
+            create_data = create_response.json()
+            
+            if 'id' not in create_data:
+                raise Exception(f"Failed to create thread with image: {create_data}")
+            
+            thread_id = create_data['id']
+            
+            # Step 2: Publish the thread
+            publish_url = f"https://graph.threads.net/v1.0/{self.user_id}/threads_publish"
+            publish_params = {
+                'creation_id': thread_id,
+                'access_token': self.access_token
+            }
+            
+            publish_response = requests.post(publish_url, data=publish_params)
+            publish_data = publish_response.json()
+            
+            if 'id' in publish_data:
+                print(f"Thread with image posted successfully. Thread ID: {publish_data['id']}")
+            else:
+                raise Exception(f"Failed to publish thread with image: {publish_data}")
+                
+        except Exception as e:
+            print(f"Failed to post thread with image: {str(e)}")
+            print("Note: Threads API requires publicly accessible image URLs")
+            raise
     
     def logout(self) -> None:
         """Logout from Threads."""
-        self.headers = None
+        self.access_token = None
         self.user_id = None
         print("Logged out from Threads Publisher.")
