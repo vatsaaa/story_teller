@@ -1,16 +1,18 @@
-from os import getenv, path
-from langchain.chains import LLMChain
-from langchain.prompts import PromptTemplate
+from os import getenv
+from dotenv import load_dotenv
 
 # Project imports
 from publishers.IPublisher import IPublisher
 from exceptions.ConfigurationException import ConfigurationException
+
+load_dotenv()
 
 class InstagramPublisher(IPublisher):
     def __init__(self, credentials: dict) -> None:
         super().__init__(credentials=credentials)
     
     def login(self) -> None:
+        """Login to Instagram with credential validation."""
         access_token = self.credentials.get('access_token')
         if not access_token:
             raise ConfigurationException(
@@ -18,65 +20,80 @@ class InstagramPublisher(IPublisher):
                 config_key="IG_ACCESS_TOKEN",
                 details={"solution": "Add IG_ACCESS_TOKEN to your .env file with your Instagram access token"}
             )
+        
+        business_account_id = self.credentials.get('business_account_id')
+        if not business_account_id:
+            raise ConfigurationException(
+                "Instagram Business Account ID is not set",
+                config_key="IG_BUSINESS_ACCOUNT_ID",
+                details={"solution": "Add IG_BUSINESS_ACCOUNT_ID to your .env file with your Instagram Business Account ID"}
+            )
+        
         self.headers = {
             'Authorization': f'Bearer {access_token}',
             'Content-Type': 'application/json'
         }
-
-    def build(self) -> dict:
-        """Build content for Instagram publishing."""
-        content = dict()
-        try:
-            if hasattr(self, 'ig') and self.ig: 
-                # TODO: Below line assumes gif file is present
-                # adopt defensive programming here to prevent errors
-                content["image"] = path.join('./output/videos/', self.story_name + ".gif")
-
-                # Get caption from the story text in English
-                text_to_get_caption_from = self.text.get("English")
-
-                # Set up the translation prompt, grammer (e.g. articles) omitted for brevity
-                caption_template = '''
-                Create a highly engaging summary from the given text between tags <TEXT> and </TEXT>, for publishing as caption on a Instagram post.
-
-                Return only the summary, not the original text. Character Vikram should not be summary.
-
-                <TEXT>{text}</TEXT>
-                '''
-
-                caption_prompt = PromptTemplate(template=caption_template, input_variables=['text'])
-
-                chain2 = LLMChain(llm=self.llm,prompt=caption_prompt)
-
-                # Extract the translated text from the API response
-                input = {'text': text_to_get_caption_from}
-                content["caption"] = chain2.run(input)
-        except Exception as e:
-            print(f"Error building Instagram content: {str(e)}")
-        
-        return content
+        self.business_account_id = business_account_id
     
     def publish(self, content: dict) -> None:
         """Publish content to Instagram."""
         try:
-            image = content.get("image")
-            caption = content.get("caption")
+            # Extract text content for caption
+            text_content = content.get("text", {})
+            hindi_text = text_content.get("hindi", "")
+            english_text = text_content.get("english", "")
+            title = text_content.get("title", "Story")
             
-            if not image or not caption:
-                print("Warning: Missing image or caption for Instagram publishing")
+            # Use English text for caption, fallback to Hindi if English not available
+            message_text = english_text if english_text else hindi_text
+            
+            if not message_text:
+                print("Warning: No text content available for Instagram publishing")
                 return
+            
+            # Create Instagram caption with title
+            caption = f"{title}\n\n{message_text}"
+            
+            # Instagram caption limit is 2200 characters
+            if len(caption) > 2200:
+                caption = caption[:2197] + "..."
+            
+            # Get image - Instagram requires at least one image
+            images = content.get("images", [])
+            if not images:
+                print("Warning: No image available for Instagram publishing. Instagram requires at least one image.")
+                return
+            
+            # Get video if available
+            videos = content.get("videos", [])
+            first_video = videos[0] if videos else None
+            
+            # Publish to Instagram
+            if first_video:
+                self._post_video(caption, first_video)
+            else:
+                self._post_image(caption, images[0])
                 
-            # For now, just print the content that would be published
-            # In a real implementation, you would use Instagram's API
-            print(f"Publishing to Instagram:")
-            print(f"Image: {image}")
-            print(f"Caption: {caption}")
             print("Instagram publishing completed successfully")
             
         except Exception as e:
             print(f"Instagram publishing failed: {str(e)}")
             raise
 
+    def _post_image(self, caption: str, image: str) -> None:
+        """Mock Instagram image posting function - in real implementation would use Instagram API."""
+        print(f"Posting to Instagram:")
+        print(f"Image: {image}")
+        print(f"Caption: {caption}")
+
+    def _post_video(self, caption: str, video: str) -> None:
+        """Mock Instagram video posting function - in real implementation would use Instagram API."""
+        print(f"Posting video to Instagram:")
+        print(f"Video: {video}")
+        print(f"Caption: {caption}")
+
     def logout(self) -> None:
+        """Logout from Instagram."""
         self.headers = None
+        self.business_account_id = None
         print("Logged out from Instagram Publisher.")

@@ -93,6 +93,7 @@ class Story(IStory):
 
     def get_sceneries(self):
         print("Getting description for sceneries...")
+        print(f"DEBUG: English story content length: {len(self.texts['English'].content) if self.texts['English'].content else 0}")
 
         template_prompt = '''Act as a highly creative visual illustrator. Based on the story within <STORY> and </STORY> tags, extract scenery descriptions as a Python dictionary.
         Each key: meaningful scene name written in CamelCase, starting with a capital letter but no spaces or special characters
@@ -104,16 +105,22 @@ class Story(IStory):
         <STORY>{story}</STORY>
         '''
 
+        print("DEBUG: Creating prompt template...")
         sceneries_prompt = PromptTemplate(template=template_prompt, input_variables=['story'])
 
+        print("DEBUG: Creating LLM chain...")
         chain2 = LLMChain(llm=self.llm, prompt=sceneries_prompt)
         input = {'story': self.texts["English"].content}
 
         try:
+            print("DEBUG: Calling LLM chain...")
             sceneries_output = chain2.run(input)
+            print(f"DEBUG: LLM raw output type: {type(sceneries_output)}")
+            print(f"DEBUG: LLM raw output (first 300 chars): {str(sceneries_output)[:300]}")
             
             # Clean the output if it's wrapped in markdown code blocks
             if isinstance(sceneries_output, str):
+                print("DEBUG: Cleaning markdown code blocks...")
                 # Remove markdown code blocks if present
                 sceneries_output = sceneries_output.strip()
                 if sceneries_output.startswith('```python'):
@@ -123,22 +130,29 @@ class Story(IStory):
                 if sceneries_output.endswith('```'):
                     sceneries_output = sceneries_output[:-3]
                 sceneries_output = sceneries_output.strip()
+                print(f"DEBUG: Cleaned output (first 300 chars): {sceneries_output[:300]}")
             
+            print("DEBUG: Attempting to parse with ast.literal_eval...")
             self.sceneries = ast.literal_eval(sceneries_output) if isinstance(sceneries_output, str) else sceneries_output
+            print("DEBUG: ast.literal_eval successful!")
             
             # Validate that sceneries were extracted
+            print("DEBUG: Validating sceneries...")
             if not self.sceneries or not isinstance(self.sceneries, dict):
+                print(f"DEBUG: Validation failed - sceneries type: {type(self.sceneries)}, content: {str(self.sceneries)[:200]}")
                 raise StoryProcessingException(
                     "No valid sceneries extracted from the story",
                     processing_step="scenery_validation",
                     details={"sceneries_output": str(sceneries_output)[:200]}
                 )
             
+            print(f"DEBUG: Sceneries validation successful, extracted {len(self.sceneries)} sceneries")
             print(f"Sceneries extracted: {self.sceneries}")
 
             # Create Image objects and append to images array
+            print("DEBUG: Creating Image objects...")
             for key, value in self.sceneries.items():
-                print(f"Creating image for scenery: {key}")
+                print(f"DEBUG: Creating image for scenery: {key}")
                 print(f"Description: {value.get('description', '')}")
                 print(f"Sentiments: {value.get('adjectives', [])}")
 
@@ -146,7 +160,11 @@ class Story(IStory):
                 image.width = 512
                 image.height = 512
                 self.images.append(image)
+            print(f"DEBUG: Created {len(self.images)} image objects successfully")
         except Exception as e:
+            print(f"DEBUG: Exception caught in get_sceneries: {type(e).__name__}: {str(e)}")
+            import traceback
+            print(f"DEBUG: Full traceback: {traceback.format_exc()}")
             raise StoryProcessingException(
                 "Failed to get sceneries", 
                 processing_step="scenery_extraction",

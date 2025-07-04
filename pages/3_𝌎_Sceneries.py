@@ -1,4 +1,4 @@
-import json, re
+import json, os, re
 import streamlit as st
 
 from utils.Utils import MULTISPACE
@@ -40,7 +40,7 @@ if st.session_state.get('story'):
                 
                 st.divider()  # Add a visual separator between sceneries
                 
-            submit_sceneries = st.form_submit_button(label='Submit')
+            submit_sceneries = st.form_submit_button(label='Generate Sceneries', help='Click to generate images based on the edited sceneries')
             if submit_sceneries:
                 # Update sceneries with edited values
                 for key in story.sceneries.keys():

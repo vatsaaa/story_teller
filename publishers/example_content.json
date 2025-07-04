@@ -1,0 +1,18 @@
+{
+    "text": {
+        "title": "The Magical Forest Adventure",
+        "english": "In a mystical forest where trees whispered ancient secrets, a young adventurer discovered a hidden path leading to a clearing filled with glowing flowers. Each flower held a different magical power - some could heal wounds, others could grant temporary flight, and the rarest ones could reveal glimpses of the future. The adventurer learned that the forest was protected by a wise old owl who had been guarding these magical flowers for centuries.",
+        "hindi": "एक रहस्यमय जंगल में जहाँ पेड़ प्राचीन रहस्यों की फुसफुसाहट करते थे, एक युवा साहसी ने एक छुपे हुए रास्ते की खोज की जो चमकते फूलों से भरी एक साफ़ जगह तक जाता था। हर फूल में एक अलग जादुई शक्ति थी - कुछ घावों को भर सकते थे, अन्य अस्थायी उड़ान दे सकते थे, और सबसे दुर्लभ फूल भविष्य की झलकियाँ दिखा सकते थे। साहसी ने सीखा कि जंगल की रक्षा एक बुद्धिमान पुराने उल्लू द्वारा की जाती थी जो सदियों से इन जादुई फूलों की रक्षा कर रहा था।"
+    },
+    "images": [
+        "./output/images/ForestCanopy.png",
+        "./output/images/ForestClearing.png",
+        "./output/images/YogisRevelation.png"
+    ],
+    "videos": [
+        "./output/videos/sample_video.mp4"
+    ],
+    "audios": [
+        "./output/audios/gtts_पहली_पुतली_रत्नमंजरी.mp3"
+    ]
+}

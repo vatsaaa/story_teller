@@ -1,21 +1,17 @@
 from dotenv import load_dotenv
-from langchain.chains.summarize import load_summarize_chain
-from langchain.prompts import PromptTemplate
-from langchain.text_splitter import RecursiveCharacterTextSplitter
-from openai import OpenAI
 from os import getenv
-
-load_dotenv()
 
 # Project imports
 from publishers.IPublisher import IPublisher
 from exceptions.ConfigurationException import ConfigurationException
 
+load_dotenv()
+
 class TwitterPublisher(IPublisher):
     def __init__(self, credentials: dict) -> None:
         super().__init__(credentials)
         
-    def login(self):
+    def login(self) -> None:
         """Login to Twitter with credential validation."""
         access_token = self.credentials.get('access_token')
         if not access_token:
@@ -24,49 +20,32 @@ class TwitterPublisher(IPublisher):
                 config_key="TWITTER_ACCESS_TOKEN",
                 details={"solution": "Add TWITTER_ACCESS_TOKEN to your .env file with your Twitter access token"}
             )
-
-    def build(self, text: str, link: str):
-        tweet = None
-        docs = None
-        llm = OpenAI(base_url="https://openrouter.ai/api/v1", api_key=getenv('OPENROUTER_API_KEY'))
-
-        template_prompt = """
-        {text}
-
-        Please suggest in single line what does above text do. {link} must be included in response.
-        The response must be catchy, engaging, suitable for a tweet and in first person.
-        Please sparingly use phrase 'Dive into the', instead use similar catchy and appealing phrases.
-        """
-
-        prompt_template = PromptTemplate(
-            template=template_prompt
-            , input_variables=['text', 'link']
-        )
-
-        tweet_prompt = prompt_template.format(text=text, link=link)
         
-        text_splitter = RecursiveCharacterTextSplitter(
-            chunk_size=1000, 
-            chunk_overlap=10
-        )
-
-        # we split the data into multiple chunks
-        try:
-            docs = text_splitter.create_documents([text, link])
-            combine_chain = load_summarize_chain(
-                llm=llm, 
-                chain_type='stuff'
+        api_key = self.credentials.get('api_key')
+        if not api_key:
+            raise ConfigurationException(
+                "Twitter API Key is not set",
+                config_key="TWITTER_API_KEY",
+                details={"solution": "Add TWITTER_API_KEY to your .env file with your Twitter API key"}
             )
-            tweet = combine_chain.run(docs)
-        except Exception as e:
-            print("Exception Occurred: ", e)
-            exit(2)
-
-        print(tweet.strip())
-
-        return tweet
+        
+        api_secret = self.credentials.get('api_secret')
+        if not api_secret:
+            raise ConfigurationException(
+                "Twitter API Secret is not set",
+                config_key="TWITTER_API_SECRET",
+                details={"solution": "Add TWITTER_API_SECRET to your .env file with your Twitter API secret"}
+            )
+        
+        access_token_secret = self.credentials.get('access_token_secret')
+        if not access_token_secret:
+            raise ConfigurationException(
+                "Twitter Access Token Secret is not set",
+                config_key="TWITTER_ACCESS_TOKEN_SECRET",
+                details={"solution": "Add TWITTER_ACCESS_TOKEN_SECRET to your .env file with your Twitter access token secret"}
+            )
     
-    def publish(self, content: dict):
+    def publish(self, content: dict) -> None:
         """Publish content to Twitter."""
         try:
             # Extract text content for tweet
@@ -82,20 +61,22 @@ class TwitterPublisher(IPublisher):
                 print("Warning: No text content available for Twitter publishing")
                 return
             
-            # Build tweet using the existing build method
-            # For now, we'll use a simple approach since we don't have a link
-            tweet_message = f"{title}: {message_text[:200]}..." if len(message_text) > 200 else f"{title}: {message_text}"
+            # Build tweet message with title
+            tweet_message = f"{title}: {message_text}"
+            
+            # Twitter character limit is 280, so truncate if necessary
+            if len(tweet_message) > 280:
+                tweet_message = tweet_message[:277] + "..."
             
             # Get image if available
             images = content.get("images", [])
             first_image = images[0] if images else None
             
             # Publish tweet
-            self._tweet(tweet_message)
-            
-            # If image available, publish with image
             if first_image:
-                self._tweet_with_image(message=tweet_message, image=first_image)
+                self._tweet_with_image(tweet_message, first_image)
+            else:
+                self._tweet(tweet_message)
                 
             print("Twitter publishing completed successfully")
             
@@ -103,13 +84,14 @@ class TwitterPublisher(IPublisher):
             print(f"Twitter publishing failed: {str(e)}")
             raise
 
-    def _tweet(self, message):
+    def _tweet(self, message: str) -> None:
         """Mock tweet function - in real implementation would use Twitter API."""
         print(f"Tweeting: {message}")
 
-    def _tweet_with_image(self, message, image):
+    def _tweet_with_image(self, message: str, image: str) -> None:
         """Mock tweet with image function - in real implementation would use Twitter API."""
         print(f"Tweeting with image: {message}, Image: {image}")
     
-    def logout(self):
-        pass
+    def logout(self) -> None:
+        """Logout from Twitter."""
+        print("Logged out from Twitter Publisher.")

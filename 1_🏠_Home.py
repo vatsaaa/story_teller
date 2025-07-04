@@ -145,7 +145,10 @@ if __name__ == "__main__":
         st.subheader("Kids stories for social media")
 
         with st.form(key='request_form'):
-            url = st.text_input(label='URL', help='Enter the URL of the story you want to generate', autocomplete='on')
+            # Use session state to preserve form values
+            mainargs_from_session = st.session_state.get('mainargs') or {}
+            current_url = mainargs_from_session.get('url', '')
+            url = st.text_input(label='URL', help='Enter the URL of the story you want to generate', autocomplete='on', value=current_url)
             if url and not re.match(URL_PATTERN, url):
                 st.error("Please give a valid URL to fetch the story from!")
 
@@ -155,19 +158,19 @@ if __name__ == "__main__":
             c_fb, c_ig, c_tw, c_yt, c_mk = st.columns([1, 1, 1, 1, 1])
 
             with c_mk:
-                cb_mk = st.checkbox(label='Mock', value=st.session_state.get('mock_mode', False))
+                cb_mk = st.checkbox(label='Mock', value=mainargs_from_session.get('mock', False))
 
             with c_fb:
-                cb_fb = st.checkbox(label='Facebook')
+                cb_fb = st.checkbox(label='Facebook', value=mainargs_from_session.get('fb', False))
         
             with c_ig:
-                cb_ig = st.checkbox(label='Instagram')
+                cb_ig = st.checkbox(label='Instagram', value=mainargs_from_session.get('ig', False))
             
             with c_tw:
-                cb_tw = st.checkbox(label='Twitter')
+                cb_tw = st.checkbox(label='Twitter', value=mainargs_from_session.get('tw', False))
             
             with c_yt:
-                cb_yt = st.checkbox(label='YouTube')
+                cb_yt = st.checkbox(label='YouTube', value=mainargs_from_session.get('yt', False))
 
             if 'mainargs' not in st.session_state:
                 st.session_state['mainargs'] = None

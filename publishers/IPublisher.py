@@ -2,10 +2,11 @@ from abc import abstractmethod, ABC
 from enum import Enum
 
 class PublisherType(Enum):
-    FACEBOOK = 0
+    TWITTER = 0
     INSTAGRAM = 1
-    TWITTER = 2
-    YOUTUBE = 3
+    THREADS = 2
+    FACEBOOK = 3
+    YOUTUBE = 4
 
 class IPublisher(ABC):
     def __init__(self, credentials: dict=None) -> None:

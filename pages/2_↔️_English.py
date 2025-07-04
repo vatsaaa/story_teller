@@ -6,7 +6,7 @@ from utils.introduction import introduction
 from utils.Utils import MULTISPACE
 from exceptions import StoryProcessingException
 
-st.title("Translate story to English")
+st.title("Story translated in English")
 
 if st.session_state.get('story'):
     story = st.session_state.get('story', None)
@@ -25,7 +25,7 @@ if st.session_state.get('story'):
             st.text_area(label="Story", height=300, value=re.sub(MULTISPACE, ' ', english_story_content))
             st.text_area(label="Conclusion", height=80, value=re.sub(MULTISPACE, ' ', conclusion.get("English")))
 
-            submit_story_e = st.form_submit_button(label='Submit')
+            submit_story_e = st.form_submit_button(label='Get sceneries', help='Click to extract sceneries from the story text')
             if submit_story_e:
                 try:
                     story.get_sceneries()
